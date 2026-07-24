@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Global Earth Map Challenge</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink-900:#10152a;
+    --ink-800:#161d38;
+    --ink-700:#1f2847;
+    --ink-600:#2a3660;
+    --gold:#c9a24b;
+    --gold-soft:#e3c47c;
+    --teal:#4fb8a8;
+    --coral:#e4634b;
+    --parchment:#ede6d6;
+    --parchment-dim:#b9b3a4;
+    --line:rgba(201,162,75,0.25);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(79,184,168,0.08), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(201,162,75,0.10), transparent 55%),
+      var(--ink-900);
+    color:var(--parchment);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 60px;}
+
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+    padding-bottom:20px;margin-bottom:26px;
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand svg{width:44px;height:44px;flex:none;}
+  .brand h1{
+    font-family:'Fraunces',serif;font-weight:600;
+    font-size:26px;letter-spacing:0.3px;margin:0;color:var(--parchment);
+  }
+  .brand p{margin:2px 0 0;font-size:12.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold-soft);}
+  nav.tabs{display:flex;gap:6px;background:var(--ink-800);border:1px solid var(--line);border-radius:999px;padding:4px;}
+  nav.tabs button{
+    border:none;background:transparent;color:var(--parchment-dim);
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;
+    padding:9px 18px;border-radius:999px;cursor:pointer;transition:all .2s ease;
+    letter-spacing:0.2px;
+  }
+  nav.tabs button.active{background:var(--gold);color:var(--ink-900);}
+  nav.tabs button:not(.active):hover{color:var(--parchment);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .card{
+    background:var(--ink-800);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:26px;
+  }
+  h2.section-title{
+    font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0 0 4px;color:var(--parchment);
+  }
+  .muted{color:var(--parchment-dim);font-size:14px;line-height:1.55;}
+
+  label.field-label{
+    display:block;font-size:12px;text-transform:uppercase;letter-spacing:1.2px;
+    color:var(--gold-soft);margin:18px 0 8px;font-weight:600;
+  }
+  input[type="text"], input[type="password"], select, input[type="number"]{
+    width:100%;background:var(--ink-900);border:1px solid var(--line);
+    color:var(--parchment);padding:11px 13px;border-radius:9px;font-size:14.5px;
+    font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, select:focus, input[type="number"]:focus{border-color:var(--gold);}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--gold);color:var(--ink-900);border:none;
+    padding:13px 22px;border-radius:9px;font-weight:700;font-size:14.5px;
+    cursor:pointer;transition:transform .12s ease, background .15s ease;
+    font-family:'Inter',sans-serif;
+  }
+  .btn:hover{background:var(--gold-soft);transform:translateY(-1px);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+  .btn.secondary{background:transparent;border:1px solid var(--line);color:var(--parchment);}
+  .btn.secondary:hover{border-color:var(--gold);background:transparent;}
+  .btn.small{padding:8px 14px;font-size:13px;}
+  .btn.danger{background:var(--coral);color:#2a0e08;}
+  .btn.danger:hover{background:#ef7b64;}
+  .btn.teal{background:var(--teal);color:#062622;}
+  .btn.teal:hover{background:#6bcabc;}
+
+  /* ---------- Play screen ---------- */
+  .play-grid{display:grid;grid-template-columns:1fr 380px;gap:20px;}
+  @media (max-width:900px){.play-grid{grid-template-columns:1fr;}}
+  #map{
+    height:520px;border-radius:14px;overflow:hidden;
+    border:1px solid var(--line);position:relative;background:#0b1a2e;
+  }
+  #admin-map{height:300px;border-radius:10px;overflow:hidden;border:1px solid var(--line);margin-top:10px;position:relative;background:#0b1a2e;}
+  .leaflet-container{background:#0b1a2e;font-family:'Inter',sans-serif;}
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{background:var(--ink-800);color:var(--parchment);}
+  .map-status-chip{
+    position:absolute;top:12px;left:12px;z-index:15;font-size:11px;
+    background:rgba(16,21,42,0.82);color:var(--parchment-dim);padding:5px 10px;border-radius:999px;
+    display:flex;align-items:center;gap:6px;pointer-events:none;border:1px solid var(--line);
+  }
+  .map-status-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+  .map-status-chip.offline .dot{background:var(--coral);}
+
+  .worldmap-svg{width:100%;height:100%;display:block;background:#0b1a2e;cursor:crosshair;touch-action:none;}
+  .worldmap-svg .land{fill:#26375e;stroke:#3a4d7a;stroke-width:0.6;}
+  .worldmap-svg .graticule{stroke:rgba(201,162,75,0.08);stroke-width:0.5;fill:none;}
+  .worldmap-svg .guess-pin{fill:#4fb8a8;stroke:#0b1a2e;stroke-width:1.2;}
+  .worldmap-svg .correct-pin{fill:#c9a24b;stroke:#0b1a2e;stroke-width:1.2;}
+  .worldmap-svg .link-line{stroke:#e4634b;stroke-width:1.4;stroke-dasharray:2.5,3;}
+  .worldmap-svg .pin-label{font-family:'Inter',sans-serif;font-size:10px;fill:var(--parchment);}
+  .map-zoom-controls{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:6px;z-index:15;}
+  .map-zoom-controls button{
+    width:30px;height:30px;border-radius:7px;border:1px solid var(--line);
+    background:var(--ink-800);color:var(--parchment);font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;line-height:1;
+  }
+  .map-zoom-controls button:hover{border-color:var(--gold);color:var(--gold);}
+
+  .hud{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:14px;flex-wrap:wrap;}
+  .hud .qcount{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--gold-soft);}
+  .timerbar-outer{height:6px;background:var(--ink-700);border-radius:4px;overflow:hidden;flex:1;min-width:120px;}
+  .timerbar-inner{height:100%;background:var(--teal);width:100%;transition:width 1s linear, background .3s;}
+  .prompt-card{padding:22px;}
+  .prompt-eyebrow{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold-soft);font-weight:600;}
+  .prompt-name{font-family:'Fraunces',serif;font-weight:700;font-size:30px;margin:8px 0 6px;line-height:1.15;}
+  .prompt-hint{font-size:14px;color:var(--parchment-dim);line-height:1.5;font-style:italic;}
+  .guess-status{
+    margin-top:18px;padding:14px;border-radius:10px;background:var(--ink-900);
+    border:1px solid var(--line);font-size:13.5px;color:var(--parchment-dim);
+  }
+  .guess-status.set{border-color:var(--teal);color:var(--teal);}
+  .result-panel{margin-top:16px;}
+  .result-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px;}
+  .result-row:last-child{border-bottom:none;}
+  .result-row .val{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .result-row .val.pts{color:var(--gold);font-size:16px;}
+  .score-total{font-family:'Fraunces',serif;font-size:34px;font-weight:700;color:var(--gold);margin:6px 0;}
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+
+  .summary-list{margin-top:18px;display:flex;flex-direction:column;gap:8px;}
+  .summary-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px;background:var(--ink-900);border:1px solid var(--line);border-radius:9px;font-size:13.5px;
+  }
+  .summary-row .sr-name{font-weight:600;}
+  .summary-row .sr-dist{color:var(--parchment-dim);font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .summary-row .sr-pts{font-family:'IBM Plex Mono',monospace;color:var(--gold);font-weight:700;}
+
+  table.lb{width:100%;border-collapse:collapse;margin-top:10px;}
+  table.lb th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1.2px;
+    color:var(--gold-soft);padding:10px 12px;border-bottom:1px solid var(--line);
+  }
+  table.lb td{padding:12px;border-bottom:1px solid rgba(201,162,75,0.12);font-size:14px;}
+  table.lb tr:hover td{background:rgba(201,162,75,0.04);}
+  .rank-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700;
+    background:var(--ink-700);color:var(--parchment-dim);
+  }
+  .rank-badge.gold{background:var(--gold);color:var(--ink-900);}
+  .rank-badge.silver{background:#c9d0da;color:var(--ink-900);}
+  .rank-badge.bronze{background:#c98a4b;color:var(--ink-900);}
+
+  .admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:900px){.admin-grid{grid-template-columns:1fr;}}
+  .qmini{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 12px;background:var(--ink-900);border:1px solid var(--line);border-radius:8px;
+    font-size:13px;margin-top:8px;
+  }
+  .qmini .qm-coord{font-family:'IBM Plex Mono',monospace;color:var(--parchment-dim);font-size:11.5px;}
+  .round-block{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px;background:var(--ink-900);}
+  .round-block-head{display:flex;justify-content:space-between;align-items:center;}
+  .pill{font-size:10.5px;padding:3px 9px;border-radius:999px;background:var(--ink-700);color:var(--gold-soft);letter-spacing:0.6px;text-transform:uppercase;}
+  textarea{
+    width:100%;background:var(--ink-900);border:1px solid var(--line);color:var(--parchment);
+    padding:10px;border-radius:8px;font-family:'Inter',sans-serif;font-size:13.5px;resize:vertical;min-height:60px;
+  }
+  .split-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+    background:var(--ink-700);border:1px solid var(--gold);color:var(--parchment);
+    padding:12px 20px;border-radius:9px;font-size:13.5px;opacity:0;pointer-events:none;
+    transition:all .25s ease;z-index:999;max-width:80vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .provider-note{font-size:12px;color:var(--parchment-dim);margin-top:8px;line-height:1.5;}
+  .provider-note a{color:var(--gold-soft);}
+
+  ::-webkit-scrollbar{width:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--ink-600);border-radius:9px;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="46" stroke="#c9a24b" stroke-width="2.5"/>
+        <circle cx="50" cy="50" r="3" fill="#c9a24b"/>
+        <path d="M50 8 L56 44 L50 50 L44 44 Z" fill="#c9a24b"/>
+        <path d="M50 92 L44 56 L50 50 L56 56 Z" fill="#4fb8a8"/>
+        <path d="M8 50 L44 44 L50 50 L44 56 Z" fill="#ede6d6" opacity="0.85"/>
+        <path d="M92 50 L56 56 L50 50 L56 44 Z" fill="#ede6d6" opacity="0.85"/>
+        <circle cx="50" cy="50" r="46" stroke="#c9a24b" stroke-width="0.5" stroke-dasharray="1 4"/>
+      </svg>
+      <div>
+        <h1>Global Earth Map Challenge</h1>
+        <p>Geography · Islamic History · Culture · Current Affairs</p>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="active" data-view="play">Play</button>
+      <button data-view="leaderboard">Leaderboard</button>
+      <button data-view="admin">Admin</button>
+    </nav>
+  </header>
+
+  <!-- ============ PLAY VIEW ============ -->
+  <div class="view active" id="view-play">
+
+    <div id="stage-start" class="card">
+      <h2 class="section-title">Chart your course</h2>
+      <p class="muted">Enter your name and begin. Pinpoint each location as fast and accurately as you can — points reward both precision and speed.</p>
+      <label class="field-label">Your name</label>
+      <input type="text" id="player-name" placeholder="e.g. Amina Yusuf" maxlength="30" style="max-width:360px;" />
+      <div style="margin-top:22px;">
+        <button class="btn" id="btn-start" disabled>Begin Challenge →</button>
+      </div>
+    </div>
+
+    <div id="stage-question" class="card" style="display:none;">
+      <div class="hud">
+        <span class="qcount" id="q-progress">Question 1 / 8</span>
+        <div class="timerbar-outer"><div class="timerbar-inner" id="timerbar"></div></div>
+        <span class="qcount" id="q-score-running">Score: 0</span>
+      </div>
+      <div class="play-grid">
+        <div id="map"></div>
+        <div>
+          <div class="card prompt-card" style="padding:20px;">
+            <div class="prompt-eyebrow">Where is this?</div>
+            <div class="prompt-name" id="q-name">Location</div>
+            <div class="prompt-hint" id="q-hint"></div>
+            <div class="guess-status" id="guess-status">Click anywhere on the map to place your pin.</div>
+            <div class="actions">
+              <button class="btn" id="btn-submit" disabled>Lock In Answer</button>
+            </div>
+            <div class="result-panel" id="result-panel" style="display:none;">
+              <div class="result-row"><span>Distance from target</span><span class="val" id="res-dist">—</span></div>
+              <div class="result-row"><span>Accuracy points</span><span class="val" id="res-acc">—</span></div>
+              <div class="result-row"><span>Speed bonus</span><span class="val" id="res-speed">—</span></div>
+              <div class="result-row"><span>Question total</span><span class="val pts" id="res-total">—</span></div>
+              <div class="actions">
+                <button class="btn teal" id="btn-next">Next Location →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="stage-summary" class="card" style="display:none;">
+      <h2 class="section-title">Round complete</h2>
+      <div class="score-total" id="summary-total">0 pts</div>
+      <p class="muted" id="summary-sub"></p>
+      <div class="summary-list" id="summary-list"></div>
+      <div class="actions">
+        <button class="btn" id="btn-save-score">Save to Leaderboard</button>
+        <button class="btn secondary" id="btn-play-again">Choose Another Round</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ LEADERBOARD VIEW ============ -->
+  <div class="view" id="view-leaderboard">
+    <div class="card">
+      <div>
+        <h2 class="section-title">Live Leaderboard</h2>
+        <p class="muted">Shared across every participant using this challenge.</p>
+      </div>
+      <table class="lb">
+        <thead><tr><th>Rank</th><th>Player</th><th>Locations</th><th>Score</th><th>Date</th></tr></thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+      <p class="muted" id="lb-empty" style="display:none;margin-top:16px;">No scores yet — be the first to play.</p>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN VIEW ============ -->
+  <div class="view" id="view-admin">
+    <div class="admin-grid">
+      <div class="card">
+        <h2 class="section-title">Create a themed round</h2>
+        <p class="muted">Build a new round, then add locations by clicking the map to set exact coordinates.</p>
+        <label class="field-label">Round title</label>
+        <input type="text" id="new-round-title" placeholder="e.g. Silk Road Cities" />
+        <label class="field-label">Category label</label>
+        <input type="text" id="new-round-category" placeholder="e.g. History & Trade" />
+        <div style="margin-top:16px;"><button class="btn small" id="btn-create-round">+ Create Round</button></div>
+
+        <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
+          <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 8px;">Add a location</h3>
+          <label class="field-label">Add to round</label>
+          <select id="target-round"></select>
+          <label class="field-label">Location name</label>
+          <input type="text" id="new-q-name" placeholder="e.g. Muziris" />
+          <label class="field-label">Hint (optional)</label>
+          <textarea id="new-q-hint" placeholder="e.g. Ancient Malabar Coast port mentioned in Roman and Tamil sources."></textarea>
+          <div class="split-fields" style="margin-top:10px;">
+            <div>
+              <label class="field-label" style="margin-top:0;">Latitude</label>
+              <input type="text" id="new-q-lat" placeholder="Click map →" readonly />
+            </div>
+            <div>
+              <label class="field-label" style="margin-top:0;">Longitude</label>
+              <input type="text" id="new-q-lng" placeholder="Click map →" readonly />
+            </div>
+          </div>
+          <div id="admin-map"></div>
+          <div style="margin-top:14px;"><button class="btn small teal" id="btn-add-question">+ Add Location to Round</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 class="section-title">Manage rounds</h2>
+          <button class="btn small danger" id="btn-reset-defaults">Reset to Defaults</button>
+        </div>
+        <p class="muted">Randomization is always on — question order shuffles each time a round is played.</p>
+        <div id="rounds-manager"></div>
+
+        <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
+          <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Challenge settings</h3>
+          <label class="field-label" style="margin-top:0;">Locations per challenge</label>
+          <input type="number" id="locations-per-challenge" min="1" max="50" style="max-width:160px;" />
+          <div style="margin-top:12px;"><button class="btn small teal" id="btn-save-settings">Save Setting</button></div>
+        </div>
+
+        <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
+          <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Map provider</h3>
+          <p class="muted">OpenStreetMap works out of the box, free, no key required. For Google Maps or Mapbox, paste in your own API key below.</p>
+          <label class="field-label" style="margin-top:0;">Provider</label>
+          <select id="map-provider">
+            <option value="osm">OpenStreetMap (free, default)</option>
+            <option value="google">Google Maps (requires API key)</option>
+            <option value="mapbox">Mapbox (requires access token)</option>
+          </select>
+          <label class="field-label">API key / access token</label>
+          <input type="text" id="map-api-key" placeholder="Paste your key here" />
+          <div style="margin-top:12px;"><button class="btn small teal" id="btn-save-map-provider">Save Map Provider</button></div>
+          <p class="provider-note">
+            Google Maps keys come from the <a href="https://console.cloud.google.com/google/maps-apis" target="_blank" rel="noopener">Google Cloud Console</a> (needs billing enabled; the Maps JavaScript API has a free monthly usage allowance). Mapbox tokens come from <a href="https://account.mapbox.com/" target="_blank" rel="noopener">mapbox.com</a> (free tier available). If the chosen provider can't load — for instance because this preview blocks outbound map requests — the game automatically falls back to OpenStreetMap, and then to a built-in offline map, so play is never interrupted. Downloading this file and hosting it yourself removes that restriction entirely.
+          </p>
+        </div>
+
+        <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
+          <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Leaderboard controls</h3>
+          <button class="btn small danger" id="btn-clear-lb">Clear Leaderboard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+
+/* ===================== DEFAULT DATA ===================== */
+const DEFAULT_ROUNDS = [
+  {
+    id:'islamic-heritage', title:'Islamic Heritage & History', category:'Islamic History', icon:'☪',
+    questions:[
+      {name:'Yathrib (Madinah)', hint:'The city that welcomed the Hijrah in 622 CE, later named Madinat al-Nabi.', lat:24.5247, lng:39.5692},
+      {name:'Madyan', hint:'The land of Prophet Shu\'ayb, on the ancient trade route near the Gulf of Aqaba.', lat:28.4667, lng:35.7000},
+      {name:'Muziris', hint:'A famed ancient port on the Malabar Coast, linked to Arab and Roman trade.', lat:10.2333, lng:76.1833},
+      {name:'Makkah', hint:'Home of the Kaaba and the direction of prayer for over a billion people.', lat:21.3891, lng:39.8579},
+      {name:'Al-Quds (Jerusalem)', hint:'Site of Al-Aqsa Mosque and the Isra and Mi\'raj.', lat:31.7683, lng:35.2137},
+      {name:'Baghdad', hint:'Founded by the Abbasids as the round city and seat of the House of Wisdom.', lat:33.3152, lng:44.3661},
+      {name:'Córdoba', hint:'Capital of Umayyad al-Andalus, home to the Great Mosque.', lat:37.8882, lng:-4.7794},
+      {name:'Timbuktu', hint:'A center of Islamic scholarship on the edge of the Sahara.', lat:16.7666, lng:-3.0026},
+      {name:'Bukhara', hint:'A jewel of the Silk Road and birthplace of Imam al-Bukhari.', lat:39.7747, lng:64.4286},
+      {name:'Istanbul (Constantinople)', hint:'Conquered in 1453, later capital of the Ottoman Caliphate.', lat:41.0082, lng:28.9784},
+      {name:'Cairo', hint:'Home to Al-Azhar, one of the oldest continually operating universities.', lat:30.0444, lng:31.2357},
+      {name:'Damascus', hint:'Seat of the Umayyad Caliphate and one of the world\'s oldest inhabited cities.', lat:33.5138, lng:36.2765}
+    ]
+  },
+  {
+    id:'capitals-world', title:'Capitals of the World', category:'World Geography', icon:'🏛',
+    questions:[
+      {name:'Tokyo', hint:'Capital of Japan.', lat:35.6762, lng:139.6503},
+      {name:'Canberra', hint:'Capital of Australia, chosen as a compromise between Sydney and Melbourne.', lat:-35.2809, lng:149.1300},
+      {name:'Ottawa', hint:'Capital of Canada.', lat:45.4215, lng:-75.6972},
+      {name:'Brasília', hint:'A planned capital built in the 1950s in Brazil\'s interior.', lat:-15.7939, lng:-47.8828},
+      {name:'Nairobi', hint:'Capital of Kenya, known as the "Green City in the Sun".', lat:-1.2921, lng:36.8219},
+      {name:'Jakarta', hint:'Capital of Indonesia (administrative capital moving to Nusantara).', lat:-6.2088, lng:106.8456},
+      {name:'Buenos Aires', hint:'Capital of Argentina, on the Río de la Plata.', lat:-34.6037, lng:-58.3816},
+      {name:'Wellington', hint:'Capital of New Zealand, known for its wind.', lat:-41.2865, lng:174.7762},
+      {name:'Reykjavík', hint:'The world\'s northernmost national capital.', lat:64.1466, lng:-21.9426},
+      {name:'Pretoria', hint:'Administrative capital of South Africa.', lat:-25.7479, lng:28.2293},
+      {name:'New Delhi', hint:'Capital of India.', lat:28.6139, lng:77.2090},
+      {name:'Ankara', hint:'Capital of Turkey, replacing Istanbul in 1923.', lat:39.9334, lng:32.8597}
+    ]
+  },
+  {
+    id:'unesco-sites', title:'UNESCO World Heritage Sites', category:'Culture & Heritage', icon:'🏺',
+    questions:[
+      {name:'Petra', hint:'The rose-red city carved by the Nabataeans in Jordan.', lat:30.3285, lng:35.4444},
+      {name:'The Great Wall', hint:'A defensive line stretching across northern China (Badaling section).', lat:40.4319, lng:116.5704},
+      {name:'Machu Picchu', hint:'An Incan citadel set high in the Andes.', lat:-13.1631, lng:-72.5450},
+      {name:'Angkor Wat', hint:'The largest religious monument in the world, in Cambodia.', lat:13.4125, lng:103.8670},
+      {name:'The Pyramids of Giza', hint:'The last standing Wonder of the Ancient World.', lat:29.9792, lng:31.1342},
+      {name:'Taj Mahal', hint:'A mausoleum of white marble built by Shah Jahan.', lat:27.1751, lng:78.0421},
+      {name:'The Colosseum', hint:'A vast amphitheatre at the heart of ancient Rome.', lat:41.8902, lng:12.4922},
+      {name:'Stonehenge', hint:'A prehistoric stone circle on the Salisbury Plain.', lat:51.1789, lng:-1.8262}
+    ]
+  },
+  {
+    id:'rivers-mountains', title:'Rivers and Mountains', category:'Physical Geography', icon:'⛰',
+    questions:[
+      {name:'Mouth of the Nile', hint:'Where Africa\'s longest river meets the Mediterranean.', lat:31.5, lng:31.5},
+      {name:'Mouth of the Amazon', hint:'Where the world\'s largest river by volume meets the Atlantic.', lat:0.0, lng:-50.0},
+      {name:'Mount Everest', hint:'Earth\'s highest peak above sea level.', lat:27.9881, lng:86.9250},
+      {name:'Mount Kilimanjaro', hint:'Africa\'s highest peak, a free-standing volcanic massif.', lat:-3.0674, lng:37.3556},
+      {name:'Mouth of the Mississippi', hint:'Where this river empties into the Gulf of Mexico.', lat:29.15, lng:-89.25},
+      {name:'Aconcagua', hint:'The highest peak in the Andes and the Americas.', lat:-32.6532, lng:-70.0109},
+      {name:'Mont Blanc', hint:'The highest summit in the Alps.', lat:45.8326, lng:6.8652},
+      {name:'Mouth of the Yangtze', hint:'Where Asia\'s longest river reaches the East China Sea.', lat:31.4, lng:121.8}
+    ]
+  },
+  {
+    id:'battlefields', title:'Historical Battlefields', category:'Military History', icon:'⚔',
+    questions:[
+      {name:'Battle of Badr', hint:'624 CE, the first major battle in Islamic history.', lat:23.7500, lng:38.7833},
+      {name:'Battle of Uhud', hint:'625 CE, fought near a mountain outside Madinah.', lat:23.6667, lng:39.6167},
+      {name:'Horns of Hattin', hint:'1187 CE, Saladin\'s decisive victory over the Crusaders.', lat:32.7500, lng:35.4500},
+      {name:'Waterloo', hint:'1815, the final defeat of Napoleon.', lat:50.6800, lng:4.4093},
+      {name:'Gettysburg', hint:'1863, a turning point of the American Civil War.', lat:39.8309, lng:-77.2311},
+      {name:'Yarmouk', hint:'636 CE, a decisive early Muslim victory over Byzantium.', lat:32.7000, lng:35.9000},
+      {name:'Ain Jalut', hint:'1260 CE, where the Mamluks halted the Mongol advance.', lat:32.5667, lng:35.3167},
+      {name:'Plassey', hint:'1757, a battle that opened the door to British rule in India.', lat:23.8103, lng:88.2572}
+    ]
+  },
+  {
+    id:'countries-capitals', title:'Countries and Capitals', category:'World Geography', icon:'🌍',
+    questions:[
+      {name:'Paris (France)', hint:'', lat:48.8566, lng:2.3522},
+      {name:'London (United Kingdom)', hint:'', lat:51.5072, lng:-0.1276},
+      {name:'Berlin (Germany)', hint:'', lat:52.5200, lng:13.4050},
+      {name:'Moscow (Russia)', hint:'', lat:55.7558, lng:37.6173},
+      {name:'Beijing (China)', hint:'', lat:39.9042, lng:116.4074},
+      {name:'Washington, D.C. (USA)', hint:'', lat:38.9072, lng:-77.0369},
+      {name:'Rabat (Morocco)', hint:'', lat:34.0209, lng:-6.8417},
+      {name:'Kuala Lumpur (Malaysia)', hint:'', lat:3.1390, lng:101.6869}
+    ]
+  }
+];
+
+/* ===================== EMBEDDED OFFLINE WORLD OUTLINE (last-resort fallback only) ===================== */
+const LAND_MASSES = [
+  [[-168,65],[-165,59],[-158,55],[-135,58],[-130,54],[-125,49],[-124,42],[-122,37],[-117,32],[-113,31],[-106,23],[-97,16],[-92,14],[-88,13],[-84,9],[-79,8],[-77,9],[-83,10],[-89,21],[-97,26],[-94,29],[-89,29],[-84,30],[-81,25],[-80,26],[-76,35],[-74,40],[-70,41],[-67,45],[-64,45],[-60,47],[-55,51],[-60,55],[-65,60],[-70,63],[-80,62],[-85,66],[-95,68],[-110,70],[-125,70],[-140,70],[-155,71],[-165,68],[-168,65]],
+  [[-45,60],[-40,62],[-25,70],[-20,77],[-30,83],[-45,83],[-55,77],[-60,70],[-55,65],[-48,61],[-45,60]],
+  [[-77,8],[-79,2],[-80,-5],[-81,-15],[-75,-20],[-71,-30],[-70,-40],[-73,-45],[-72,-52],[-68,-55],[-65,-55],[-62,-50],[-58,-38],[-57,-35],[-48,-25],[-40,-15],[-35,-8],[-40,-3],[-50,0],[-60,5],[-67,8],[-72,9],[-77,8]],
+  [[-17,21],[-16,15],[-17,12],[-13,8],[-9,5],[-4,5],[2,6],[6,4],[9,4],[9,1],[14,-3],[12,-6],[13,-10],[17,-18],[13,-23],[15,-27],[18,-34],[25,-34],[28,-33],[33,-27],[35,-22],[40,-25],[47,-25],[43,-12],[41,-2],[40,5],[43,11],[41,15],[38,18],[35,20],[33,27],[25,31],[10,37],[9,37],[0,35],[-6,35],[-9,30],[-17,21]],
+  [[-9,36],[-9,43],[-2,43],[3,42],[3,44],[7,43],[10,44],[13,45],[13,40],[19,40],[23,36],[27,36],[27,40],[35,36],[36,34],[35,32],[34,31],[33,32],[35,37],[41,37],[44,37],[48,40],[54,37],[52,40],[47,45],[48,46],[54,47],[52,52],[60,55],[70,55],[73,50],[80,50],[87,50],[95,50],[100,52],[110,52],[115,52],[120,52],[130,52],[140,50],[145,43],[142,45],[135,48],[135,52],[140,55],[145,60],[160,60],[170,65],[178,68],[180,70],[170,70],[150,72],[130,72],[110,73],[95,73],[80,72],[65,70],[50,68],[40,66],[35,68],[35,70],[30,70],[25,70],[20,70],[15,68],[10,65],[5,62],[5,58],[8,54],[5,52],[0,51],[-5,49],[-1,50],[-5,48],[-1,49],[-4,48],[-5,43],[-9,43],[-9,36]],
+  [[-5,50],[-6,54],[-5,58],[-3,58],[-1,55],[0,52],[1,51],[-1,50],[-5,50]],
+  [[130,31],[132,33],[135,35],[139,36],[141,39],[141,43],[145,44],[142,45],[140,40],[136,37],[133,34],[130,31]],
+  [[95,5],[97,3],[100,-2],[103,-5],[106,-6],[104,-3],[99,2],[95,5]],
+  [[106,-6],[110,-7],[114,-8],[112,-7],[108,-6],[106,-6]],
+  [[109,4],[115,4],[118,1],[117,-3],[113,-4],[109,0],[109,4]],
+  [[131,-1],[141,-3],[151,-10],[147,-9],[140,-8],[135,-5],[131,-1]],
+  [[113,-22],[114,-26],[115,-34],[118,-35],[130,-32],[136,-35],[138,-35],[141,-38],[147,-38],[150,-37],[153,-28],[153,-24],[146,-19],[142,-11],[137,-12],[133,-12],[130,-13],[126,-14],[122,-18],[113,-22]],
+  [[173,-41],[175,-38],[178,-38],[178,-40],[175,-41],[173,-41]],
+  [[167,-44],[170,-42],[173,-41],[171,-44],[168,-46],[167,-44]],
+  [[43,-12],[47,-13],[49,-16],[47,-22],[45,-25],[43,-21],[44,-16],[43,-12]]
+];
+
+/* ===================== STATE ===================== */
+let rounds = [];
+let currentQuestions = [];
+let locationsPerChallenge = 8;
+let qIndex = 0;
+let runningScore = 0;
+let perQuestionResults = [];
+let currentGuess = null;
+let playMap = null, adminMap = null;
+let timerInterval = null;
+let timeLeft = 30;
+const TIME_LIMIT = 30;
+let questionStartTs = 0;
+let playerName = '';
+let mapSettings = { provider:'osm', apiKey:'' };
+
+/* ===================== STORAGE HELPERS ===================== */
+async function storageGet(key, shared){
+  try{
+    const r = await window.storage.get(key, shared);
+    return r ? JSON.parse(r.value) : null;
+  }catch(e){ return null; }
+}
+async function storageSet(key, value, shared){
+  try{ await window.storage.set(key, JSON.stringify(value), shared); }catch(e){ console.error('storage set failed', e); }
+}
+
+async function loadRounds(){
+  let data = await storageGet('rounds-data', true);
+  if(!data || !Array.isArray(data) || data.length===0){
+    data = DEFAULT_ROUNDS;
+    await storageSet('rounds-data', data, true);
+  }
+  rounds = data;
+}
+async function saveRounds(){ await storageSet('rounds-data', rounds, true); }
+
+async function loadSettings(){
+  const s = await storageGet('challenge-settings', true);
+  locationsPerChallenge = (s && s.locationsPerChallenge) ? s.locationsPerChallenge : 8;
+  const m = await storageGet('map-settings', true);
+  if(m && m.provider) mapSettings = m;
+}
+async function saveSettings(){
+  await storageSet('challenge-settings', {locationsPerChallenge}, true);
+}
+async function saveMapSettings(){
+  await storageSet('map-settings', mapSettings, true);
+}
+
+async function loadLeaderboard(){
+  let data = await storageGet('leaderboard-data', true);
+  if(!data || !Array.isArray(data)) data = [];
+  return data;
+}
+async function saveLeaderboard(list){
+  if(list.length>200) list = list.slice(0,200);
+  await storageSet('leaderboard-data', list, true);
+}
+
+/* ===================== UTIL ===================== */
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R=6371;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  return R*c;
+}
+function accuracyScore(distKm){
+  const maxPts=5000;
+  if(distKm<=25) return maxPts;
+  if(distKm>=4000) return 0;
+  return Math.round(maxPts*Math.exp(-distKm/900));
+}
+function speedBonus(seconds){
+  const maxBonus=1000;
+  const s = Math.min(seconds, TIME_LIMIT);
+  return Math.round(maxBonus*Math.max(0,(TIME_LIMIT-s)/TIME_LIMIT));
+}
+function fmtDist(km){
+  return km<1 ? `${Math.round(km*1000)} m` : `${km.toFixed(1)} km`;
+}
+function shuffle(arr){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(showToast._h);
+  showToast._h=setTimeout(()=>t.classList.remove('show'),3200);
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ===================== OFFLINE VECTOR FALLBACK (last resort only) ===================== */
+const MAP_VB_W = 1000, MAP_VB_H = 500;
+function lngLatToXY(lng,lat){ return { x:(lng+180)/360*MAP_VB_W, y:(90-lat)/180*MAP_VB_H }; }
+function xyToLngLat(x,y){ return { lng: x/MAP_VB_W*360-180, lat: 90 - y/MAP_VB_H*180 }; }
+function landPolygonsMarkup(){
+  return LAND_MASSES.map(ring=>{
+    const pts = ring.map(([lon,lat])=>{ const p=lngLatToXY(lon,lat); return `${p.x.toFixed(1)},${p.y.toFixed(1)}`; }).join(' ');
+    return `<polygon class="land" points="${pts}"/>`;
+  }).join('');
+}
+function graticuleMarkup(){
+  let lines='';
+  for(let lon=-180; lon<=180; lon+=30){
+    const x=(lon+180)/360*MAP_VB_W;
+    lines += `<line class="graticule" x1="${x}" y1="0" x2="${x}" y2="${MAP_VB_H}"/>`;
+  }
+  for(let lat=-60; lat<=60; lat+=30){
+    const y=(90-lat)/180*MAP_VB_H;
+    lines += `<line class="graticule" x1="0" y1="${y}" x2="${MAP_VB_W}" y2="${y}"/>`;
+  }
+  return lines;
+}
+class VectorMap{
+  constructor(container, onPick){
+    this.container=container; this.onPick=onPick; this.locked=false;
+    this.vb={x:0,y:0,w:MAP_VB_W,h:MAP_VB_H};
+    this.guessPt=null; this.correctPt=null;
+    this._build(); this._wire();
+  }
+  _build(){
+    this.container.innerHTML = `
+      <div class="map-status-chip offline"><span class="dot"></span>Offline map</div>
+      <svg class="worldmap-svg" viewBox="0 0 ${MAP_VB_W} ${MAP_VB_H}" preserveAspectRatio="xMidYMid slice">
+        <rect x="0" y="0" width="${MAP_VB_W}" height="${MAP_VB_H}" fill="#0b1a2e"></rect>
+        <g>${graticuleMarkup()}</g>
+        <g>${landPolygonsMarkup()}</g>
+        <g class="pins-layer"></g>
+      </svg>
+      <div class="map-zoom-controls">
+        <button type="button" data-zoom="in">+</button>
+        <button type="button" data-zoom="out">−</button>
+        <button type="button" data-zoom="reset">⤾</button>
+      </div>`;
+    this.svg=this.container.querySelector('svg');
+    this.pins=this.container.querySelector('.pins-layer');
+    this._applyVb();
+  }
+  _applyVb(){ this.svg.setAttribute('viewBox', `${this.vb.x} ${this.vb.y} ${this.vb.w} ${this.vb.h}`); }
+  _toSvg(cx,cy){
+    const pt=this.svg.createSVGPoint(); pt.x=cx; pt.y=cy;
+    const ctm=this.svg.getScreenCTM(); if(!ctm) return {x:0,y:0};
+    const p=pt.matrixTransform(ctm.inverse()); return {x:p.x,y:p.y};
+  }
+  _clamp(){
+    this.vb.w=Math.min(Math.max(this.vb.w,40),MAP_VB_W); this.vb.h=this.vb.w/2;
+    this.vb.x=Math.min(Math.max(this.vb.x,0),MAP_VB_W-this.vb.w);
+    this.vb.y=Math.min(Math.max(this.vb.y,0),MAP_VB_H-this.vb.h);
+  }
+  zoomAt(cx,cy,factor){
+    const before=this._toSvg(cx,cy);
+    const newW=this.vb.w*factor, newH=newW/2;
+    this.vb.x=before.x-(before.x-this.vb.x)*(newW/this.vb.w);
+    this.vb.y=before.y-(before.y-this.vb.y)*(newH/this.vb.h);
+    this.vb.w=newW; this.vb.h=newH; this._clamp(); this._applyVb();
+  }
+  resetView(){ this.vb={x:0,y:0,w:MAP_VB_W,h:MAP_VB_H}; this._applyVb(); }
+  _wire(){
+    this.svg.addEventListener('wheel', e=>{ e.preventDefault(); this.zoomAt(e.clientX,e.clientY, e.deltaY<0?0.85:1.18); }, {passive:false});
+    this.container.querySelectorAll('.map-zoom-controls button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const r=this.svg.getBoundingClientRect(); const cx=r.left+r.width/2, cy=r.top+r.height/2;
+        if(btn.dataset.zoom==='in') this.zoomAt(cx,cy,0.7);
+        else if(btn.dataset.zoom==='out') this.zoomAt(cx,cy,1.4);
+        else this.resetView();
+      });
+    });
+    let down=false, dragged=false, start=null, startVb=null;
+    this.svg.addEventListener('pointerdown', e=>{
+      down=true; dragged=false; start={x:e.clientX,y:e.clientY}; startVb={x:this.vb.x,y:this.vb.y};
+      this.svg.setPointerCapture(e.pointerId);
+    });
+    this.svg.addEventListener('pointermove', e=>{
+      if(!down) return;
+      const dx=e.clientX-start.x, dy=e.clientY-start.y;
+      if(Math.abs(dx)>4||Math.abs(dy)>4) dragged=true;
+      if(dragged){
+        const r=this.svg.getBoundingClientRect();
+        this.vb.x=startVb.x-dx*(this.vb.w/r.width); this.vb.y=startVb.y-dy*(this.vb.h/r.height);
+        this._clamp(); this._applyVb();
+      }
+    });
+    const end=(e)=>{
+      if(!down) return; down=false;
+      if(!dragged && !this.locked){
+        const p=this._toSvg(e.clientX,e.clientY); const {lng,lat}=xyToLngLat(p.x,p.y);
+        this.setGuess(lat,lng); this.onPick(lat,lng);
+      }
+    };
+    this.svg.addEventListener('pointerup', end);
+    this.svg.addEventListener('pointercancel', ()=>{down=false;});
+  }
+  setGuess(lat,lng){ this.guessPt={lat,lng}; this._render(); }
+  setCorrect(lat,lng,label){ this.correctPt={lat,lng,label}; this._render(); }
+  clearAll(){ this.guessPt=null; this.correctPt=null; this.locked=false; this._render(); }
+  lock(){ this.locked=true; }
+  _render(){
+    let s='';
+    if(this.guessPt && this.correctPt){
+      const g=lngLatToXY(this.guessPt.lng,this.guessPt.lat), c=lngLatToXY(this.correctPt.lng,this.correctPt.lat);
+      s+=`<line class="link-line" x1="${g.x}" y1="${g.y}" x2="${c.x}" y2="${c.y}"/>`;
+    }
+    if(this.guessPt){ const g=lngLatToXY(this.guessPt.lng,this.guessPt.lat); s+=`<circle class="guess-pin" cx="${g.x}" cy="${g.y}" r="4.5"/>`; }
+    if(this.correctPt){
+      const c=lngLatToXY(this.correctPt.lng,this.correctPt.lat);
+      s+=`<circle class="correct-pin" cx="${c.x}" cy="${c.y}" r="5"/>`;
+      if(this.correctPt.label) s+=`<text class="pin-label" x="${c.x+8}" y="${c.y-6}">${escapeHtml(this.correctPt.label)}</text>`;
+    }
+    this.pins.innerHTML=s;
+  }
+  focusOn(lat,lng,w){ const p=lngLatToXY(lng,lat); this.vb.w=w||200; this.vb.h=this.vb.w/2; this.vb.x=p.x-this.vb.w/2; this.vb.y=p.y-this.vb.h/2; this._clamp(); this._applyVb(); }
+  focusOnPair(a,b){
+    const p1=lngLatToXY(a.lng,a.lat), p2=lngLatToXY(b.lng,b.lat);
+    const minX=Math.min(p1.x,p2.x), maxX=Math.max(p1.x,p2.x), minY=Math.min(p1.y,p2.y), maxY=Math.max(p1.y,p2.y);
+    const padX=Math.max((maxX-minX)*0.4,30), padY=Math.max((maxY-minY)*0.4,20);
+    this.vb.x=minX-padX; this.vb.y=minY-padY; this.vb.w=Math.max((maxX-minX)+padX*2,60); this.vb.h=this.vb.w/2;
+    this._clamp(); this._applyVb();
+  }
+}
+
+/* ===================== MAP CONTROLLER ===================== */
+/* Tries the configured real-map provider first (Google / Mapbox / OpenStreetMap),
+   verifies it actually rendered content, and only falls back to the offline
+   vector map if every live option fails. */
+let googleLoaderPromise = null;
+function loadGoogleMaps(key){
+  if(window.google && window.google.maps) return Promise.resolve(true);
+  if(googleLoaderPromise) return googleLoaderPromise;
+  googleLoaderPromise = new Promise(resolve=>{
+    let settled=false;
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;
+    script.async = true;
+    script.onload = ()=>{ if(settled) return; settled=true; resolve(!!(window.google && window.google.maps)); };
+    script.onerror = ()=>{ if(settled) return; settled=true; resolve(false); };
+    document.head.appendChild(script);
+    setTimeout(()=>{ if(settled) return; settled=true; resolve(false); }, 5000);
+  });
+  return googleLoaderPromise;
+}
+
+class MapController{
+  constructor(container, opts){
+    this.container = container;
+    this.onPick = (opts && opts.onPick) || function(){};
+    this.locked = false;
+    this.mode = null;
+    this._guess = null; this._correct = null;
+    this._chip = null;
+    this._init();
+  }
+  _setChip(text, offline){
+    if(this._chip) this._chip.remove();
+    this._chip = document.createElement('div');
+    this._chip.className = 'map-status-chip' + (offline?' offline':'');
+    this._chip.innerHTML = `<span class="dot"></span>${escapeHtml(text)}`;
+    this.container.appendChild(this._chip);
+  }
+  async _init(){
+    this.container.innerHTML = '<div class="map-status-chip"><span class="dot"></span>Loading map…</div>';
+    const provider = mapSettings.provider || 'osm';
+    const key = mapSettings.apiKey || '';
+
+    if(provider==='google' && key){
+      const ok = await this._tryGoogle(key);
+      if(ok) return;
+      showToast('Google Maps could not load — trying OpenStreetMap instead.');
+    }
+    if(provider==='mapbox' && key){
+      const ok = await this._tryLeafletTiles(
+        `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${encodeURIComponent(key)}`,
+        'Mapbox', 'Mapbox'
+      );
+      if(ok) return;
+      showToast('Mapbox could not load — trying OpenStreetMap instead.');
+    }
+    const okOsm = await this._tryLeafletTiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png', 'OpenStreetMap contributors', 'OpenStreetMap');
+    if(okOsm) return;
+    const okBackup = await this._tryLeafletTiles('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', 'OpenStreetMap contributors, SRTM, OpenTopoMap', 'OpenTopoMap', {subdomains:'abc', maxZoom:17});
+    if(okBackup) return;
+
+    this._initVector();
+    showToast('Live map tiles are blocked in this preview — using the built-in offline map. Download the file and host it to get live tiles everywhere.');
+  }
+  _tryLeafletTiles(url, attribution, label, extraOpts){
+    return new Promise(resolve=>{
+      if(typeof L === 'undefined'){ resolve(false); return; }
+      this.container.innerHTML = '';
+      let lmap;
+      try{
+        lmap = L.map(this.container, {worldCopyJump:true}).setView([20,10], 2);
+      }catch(e){ resolve(false); return; }
+      let success=0, settled=false;
+      const layer = L.tileLayer(url, Object.assign({attribution:'&copy; '+attribution, maxZoom:19}, extraOpts||{}));
+      layer.on('tileload', ()=>{ success++; });
+      const finish = (ok)=>{
+        if(settled) return; settled=true;
+        if(ok){
+          this._setupLeaflet(lmap, label);
+          resolve(true);
+        }else{
+          try{ lmap.remove(); }catch(e){}
+          resolve(false);
+        }
+      };
+      layer.on('load', ()=>{ setTimeout(()=>finish(success>0), 150); });
+      layer.addTo(lmap);
+      setTimeout(()=>lmap.invalidateSize(), 60);
+      setTimeout(()=>finish(success>0), 4500);
+    });
+  }
+  _setupLeaflet(lmap, label){
+    this.mode='leaflet';
+    this.lmap=lmap;
+    this._setChip(label, false);
+    lmap.on('click', e=>{
+      if(this.locked) return;
+      this.setGuess(e.latlng.lat, e.latlng.lng);
+      this.onPick(e.latlng.lat, e.latlng.lng);
+    });
+    setTimeout(()=>lmap.invalidateSize(), 100);
+  }
+  _tryGoogle(key){
+    return new Promise(async resolve=>{
+      const ok = await loadGoogleMaps(key);
+      if(!ok){ resolve(false); return; }
+      try{
+        this.container.innerHTML = '';
+        this.gmap = new google.maps.Map(this.container, {
+          center:{lat:20,lng:10}, zoom:2, streetViewControl:false, mapTypeControl:false,
+          fullscreenControl:false, styles:[{elementType:'geometry',stylers:[{color:'#1f2847'}]},{elementType:'labels.text.fill',stylers:[{color:'#b9b3a4'}]},{elementType:'labels.text.stroke',stylers:[{color:'#10152a'}]},{featureType:'water',elementType:'geometry',stylers:[{color:'#0b1a2e'}]}]
+        });
+        google.maps.event.addListenerOnce(this.gmap, 'idle', ()=>{
+          this.mode='google';
+          this._setChip('Google Maps', false);
+          this.gmap.addListener('click', e=>{
+            if(this.locked) return;
+            const lat=e.latLng.lat(), lng=e.latLng.lng();
+            this.setGuess(lat,lng); this.onPick(lat,lng);
+          });
+          resolve(true);
+        });
+        setTimeout(()=>{ if(this.mode!=='google') resolve(false); }, 4500);
+      }catch(e){ resolve(false); }
+    });
+  }
+  _initVector(){
+    this.mode='vector';
+    this.vector = new VectorMap(this.container, (lat,lng)=>{ if(!this.locked) this.onPick(lat,lng); });
+  }
+  setGuess(lat,lng){
+    this._guess={lat,lng};
+    if(this.mode==='leaflet'){
+      if(this._lGuess) this.lmap.removeLayer(this._lGuess);
+      this._lGuess = L.circleMarker([lat,lng], {radius:8,color:'#4fb8a8',weight:2,fillColor:'#4fb8a8',fillOpacity:0.85}).addTo(this.lmap);
+    }else if(this.mode==='google'){
+      if(this._gGuess) this._gGuess.setMap(null);
+      this._gGuess = new google.maps.Marker({position:{lat,lng}, map:this.gmap, icon:{path:google.maps.SymbolPath.CIRCLE, scale:8, fillColor:'#4fb8a8', fillOpacity:0.9, strokeColor:'#0b1a2e', strokeWeight:2}});
+    }else if(this.mode==='vector'){
+      this.vector.setGuess(lat,lng);
+    }
+  }
+  setCorrect(lat,lng,label){
+    this._correct={lat,lng,label};
+    if(this.mode==='leaflet'){
+      if(this._lCorrect) this.lmap.removeLayer(this._lCorrect);
+      this._lCorrect = L.circleMarker([lat,lng], {radius:9,color:'#c9a24b',weight:2,fillColor:'#c9a24b',fillOpacity:0.9}).addTo(this.lmap).bindTooltip(label, {permanent:true, direction:'top', offset:[0,-10]});
+      if(this._guess){
+        if(this._lLine) this.lmap.removeLayer(this._lLine);
+        this._lLine = L.polyline([[this._guess.lat,this._guess.lng],[lat,lng]], {color:'#e4634b', weight:2, dashArray:'4,6'}).addTo(this.lmap);
+      }
+    }else if(this.mode==='google'){
+      if(this._gCorrect) this._gCorrect.setMap(null);
+      this._gCorrect = new google.maps.Marker({position:{lat,lng}, map:this.gmap, label:{text:label,color:'#ede6d6',fontSize:'11px'}, icon:{path:google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#c9a24b', fillOpacity:0.95, strokeColor:'#0b1a2e', strokeWeight:2}});
+      if(this._guess){
+        if(this._gLine) this._gLine.setMap(null);
+        this._gLine = new google.maps.Polyline({path:[{lat:this._guess.lat,lng:this._guess.lng},{lat,lng}], strokeColor:'#e4634b', strokeOpacity:0.9, strokeWeight:2, map:this.gmap});
+      }
+    }else if(this.mode==='vector'){
+      this.vector.setCorrect(lat,lng,label);
+    }
+  }
+  clearAll(){
+    this._guess=null; this._correct=null; this.locked=false;
+    if(this.mode==='leaflet'){
+      if(this._lGuess){ this.lmap.removeLayer(this._lGuess); this._lGuess=null; }
+      if(this._lCorrect){ this.lmap.removeLayer(this._lCorrect); this._lCorrect=null; }
+      if(this._lLine){ this.lmap.removeLayer(this._lLine); this._lLine=null; }
+    }else if(this.mode==='google'){
+      if(this._gGuess){ this._gGuess.setMap(null); this._gGuess=null; }
+      if(this._gCorrect){ this._gCorrect.setMap(null); this._gCorrect=null; }
+      if(this._gLine){ this._gLine.setMap(null); this._gLine=null; }
+    }else if(this.mode==='vector' && this.vector){
+      this.vector.clearAll();
+    }
+  }
+  lock(){ this.locked=true; if(this.mode==='vector' && this.vector) this.vector.lock(); }
+  resetView(){
+    if(this.mode==='leaflet'){ this.lmap.setView([20,10],2); }
+    else if(this.mode==='google'){ this.gmap.setCenter({lat:20,lng:10}); this.gmap.setZoom(2); }
+    else if(this.mode==='vector' && this.vector){ this.vector.resetView(); }
+  }
+  focusOn(lat,lng){
+    if(this.mode==='leaflet'){ this.lmap.setView([lat,lng], 5); }
+    else if(this.mode==='google'){ this.gmap.setCenter({lat,lng}); this.gmap.setZoom(6); }
+    else if(this.mode==='vector' && this.vector){ this.vector.focusOn(lat,lng,140); }
+  }
+  focusOnPair(a,b){
+    if(this.mode==='leaflet'){
+      this.lmap.fitBounds(L.latLngBounds([[a.lat,a.lng],[b.lat,b.lng]]), {padding:[60,60]});
+    }else if(this.mode==='google'){
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({lat:a.lat,lng:a.lng}); bounds.extend({lat:b.lat,lng:b.lng});
+      this.gmap.fitBounds(bounds, 60);
+    }else if(this.mode==='vector' && this.vector){
+      this.vector.focusOnPair(a,b);
+    }
+  }
+}
+
+/* ===================== VIEW SWITCHING ===================== */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>switchView(btn.dataset.view));
+});
+function switchView(view){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  if(view==='leaderboard') renderLeaderboard();
+  if(view==='admin') renderAdmin();
+}
+
+/* ===================== PLAY: START SCREEN ===================== */
+function updateStartBtn(){
+  const nameOk = document.getElementById('player-name').value.trim().length>0;
+  const hasQuestions = rounds.some(r=>r.questions.length>0);
+  document.getElementById('btn-start').disabled = !(nameOk && hasQuestions);
+}
+document.getElementById('player-name').addEventListener('input', updateStartBtn);
+
+document.getElementById('btn-start').addEventListener('click', ()=>{
+  playerName = document.getElementById('player-name').value.trim().slice(0,30);
+  const pool = rounds.flatMap(r=>r.questions);
+  currentQuestions = shuffle(pool).slice(0, Math.min(locationsPerChallenge, pool.length));
+  qIndex=0; runningScore=0; perQuestionResults=[];
+  document.getElementById('stage-start').style.display='none';
+  document.getElementById('stage-summary').style.display='none';
+  document.getElementById('stage-question').style.display='block';
+  initMapIfNeeded();
+  loadQuestion();
+});
+
+/* ===================== MAP INIT ===================== */
+function initMapIfNeeded(){
+  if(playMap) return;
+  playMap = new MapController(document.getElementById('map'), {
+    onPick: (lat,lng)=>{
+      currentGuess = {lat,lng};
+      document.getElementById('guess-status').textContent = `Pin placed at ${lat.toFixed(2)}, ${lng.toFixed(2)}. Click again to move it, or lock in.`;
+      document.getElementById('guess-status').classList.add('set');
+      document.getElementById('btn-submit').disabled=false;
+    }
+  });
+}
+
+/* ===================== QUESTION FLOW ===================== */
+function loadQuestion(){
+  const q = currentQuestions[qIndex];
+  document.getElementById('q-progress').textContent = `Question ${qIndex+1} / ${currentQuestions.length}`;
+  document.getElementById('q-score-running').textContent = `Score: ${runningScore}`;
+  document.getElementById('q-name').textContent = q.name;
+  document.getElementById('q-hint').textContent = q.hint || '';
+  document.getElementById('guess-status').textContent = 'Click anywhere on the map to place your pin.';
+  document.getElementById('guess-status').classList.remove('set');
+  document.getElementById('btn-submit').disabled=true;
+  document.getElementById('result-panel').style.display='none';
+
+  currentGuess=null;
+  if(playMap){ playMap.clearAll(); playMap.resetView(); }
+
+  timeLeft = TIME_LIMIT;
+  questionStartTs = Date.now();
+  updateTimerBar();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    timeLeft -= 1;
+    updateTimerBar();
+    if(timeLeft<=0){
+      clearInterval(timerInterval);
+      submitAnswer(true);
+    }
+  },1000);
+}
+function updateTimerBar(){
+  const pct = Math.max(0,(timeLeft/TIME_LIMIT)*100);
+  const bar = document.getElementById('timerbar');
+  bar.style.width = pct+'%';
+  bar.style.background = pct<25 ? 'var(--coral)' : (pct<55 ? 'var(--gold)' : 'var(--teal)');
+}
+
+document.getElementById('btn-submit').addEventListener('click', ()=>submitAnswer(false));
+
+function submitAnswer(timedOut){
+  clearInterval(timerInterval);
+  if(playMap) playMap.lock();
+  const q = currentQuestions[qIndex];
+  const elapsedSec = (Date.now()-questionStartTs)/1000;
+
+  let distKm, acc, speed;
+  if(!currentGuess){
+    distKm = null; acc = 0; speed = 0;
+  }else{
+    distKm = haversineKm(currentGuess.lat, currentGuess.lng, q.lat, q.lng);
+    acc = accuracyScore(distKm);
+    speed = timedOut ? 0 : speedBonus(elapsedSec);
+  }
+  const total = acc + speed;
+  runningScore += total;
+  perQuestionResults.push({name:q.name, distKm, points:total});
+
+  if(playMap){
+    playMap.setCorrect(q.lat, q.lng, q.name);
+    if(currentGuess){
+      playMap.setGuess(currentGuess.lat, currentGuess.lng);
+      playMap.focusOnPair({lat:currentGuess.lat,lng:currentGuess.lng}, {lat:q.lat,lng:q.lng});
+    }else{
+      playMap.focusOn(q.lat, q.lng);
+    }
+  }
+
+  document.getElementById('res-dist').textContent = distKm===null ? 'No guess placed' : fmtDist(distKm);
+  document.getElementById('res-acc').textContent = acc+' pts';
+  document.getElementById('res-speed').textContent = speed+' pts';
+  document.getElementById('res-total').textContent = total+' pts';
+  document.getElementById('result-panel').style.display='block';
+  document.getElementById('btn-submit').disabled=true;
+  document.getElementById('q-score-running').textContent = `Score: ${runningScore}`;
+}
+
+document.getElementById('btn-next').addEventListener('click', ()=>{
+  qIndex++;
+  if(qIndex>=currentQuestions.length){
+    showSummary();
+  }else{
+    loadQuestion();
+  }
+});
+
+function showSummary(){
+  document.getElementById('stage-question').style.display='none';
+  document.getElementById('stage-summary').style.display='block';
+  document.getElementById('summary-total').textContent = runningScore+' pts';
+  document.getElementById('summary-sub').textContent = `${playerName} · ${currentQuestions.length} locations`;
+  const list = document.getElementById('summary-list');
+  list.innerHTML='';
+  perQuestionResults.forEach(r=>{
+    const div=document.createElement('div');
+    div.className='summary-row';
+    div.innerHTML = `<span class="sr-name">${escapeHtml(r.name)}</span>
+      <span class="sr-dist">${r.distKm===null?'no guess':fmtDist(r.distKm)}</span>
+      <span class="sr-pts">${r.points} pts</span>`;
+    list.appendChild(div);
+  });
+  document.getElementById('btn-save-score').disabled=false;
+  document.getElementById('btn-save-score').textContent='Save to Leaderboard';
+}
+
+document.getElementById('btn-save-score').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btn-save-score');
+  btn.disabled=true; btn.textContent='Saving…';
+  const list = await loadLeaderboard();
+  list.push({
+    name:playerName, score:runningScore, count:currentQuestions.length,
+    date:new Date().toISOString()
+  });
+  list.sort((a,b)=>b.score-a.score);
+  await saveLeaderboard(list);
+  btn.textContent='Saved ✓';
+  showToast('Score saved to the leaderboard');
+});
+
+document.getElementById('btn-play-again').addEventListener('click', ()=>{
+  document.getElementById('stage-summary').style.display='none';
+  document.getElementById('stage-start').style.display='block';
+  document.getElementById('player-name').value='';
+  updateStartBtn();
+});
+
+/* ===================== LEADERBOARD ===================== */
+async function renderLeaderboard(){
+  const list = await loadLeaderboard();
+  drawLeaderboard(list);
+}
+function drawLeaderboard(list){
+  const body = document.getElementById('lb-body');
+  body.innerHTML='';
+  document.getElementById('lb-empty').style.display = list.length===0 ? 'block':'none';
+  list.slice(0,50).forEach((row,i)=>{
+    const tr=document.createElement('tr');
+    const badgeClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    tr.innerHTML = `
+      <td><span class="rank-badge ${badgeClass}">${i+1}</span></td>
+      <td>${escapeHtml(row.name)}</td>
+      <td class="muted">${row.count||''}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--gold);">${row.score}</td>
+      <td class="muted">${new Date(row.date).toLocaleDateString()}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+/* ===================== ADMIN ===================== */
+function renderAdmin(){
+  const targetSel = document.getElementById('target-round');
+  targetSel.innerHTML = rounds.map(r=>`<option value="${r.id}">${escapeHtml(r.title)}</option>`).join('');
+  document.getElementById('locations-per-challenge').value = locationsPerChallenge;
+  document.getElementById('map-provider').value = mapSettings.provider || 'osm';
+  document.getElementById('map-api-key').value = mapSettings.apiKey || '';
+  initAdminMapIfNeeded();
+  renderRoundsManager();
+}
+function initAdminMapIfNeeded(){
+  if(adminMap) return;
+  adminMap = new MapController(document.getElementById('admin-map'), {
+    onPick: (lat,lng)=>{
+      document.getElementById('new-q-lat').value = lat.toFixed(4);
+      document.getElementById('new-q-lng').value = lng.toFixed(4);
+    }
+  });
+}
+
+document.getElementById('btn-create-round').addEventListener('click', async ()=>{
+  const title = document.getElementById('new-round-title').value.trim();
+  const category = document.getElementById('new-round-category').value.trim();
+  if(!title){ showToast('Give the round a title first'); return; }
+  const id = title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') + '-' + Date.now().toString(36).slice(-4);
+  rounds.push({id, title, category, icon:'📍', questions:[]});
+  await saveRounds();
+  document.getElementById('new-round-title').value='';
+  document.getElementById('new-round-category').value='';
+  showToast('Round created');
+  renderAdmin();
+});
+
+document.getElementById('btn-add-question').addEventListener('click', async ()=>{
+  const roundId = document.getElementById('target-round').value;
+  const name = document.getElementById('new-q-name').value.trim();
+  const hint = document.getElementById('new-q-hint').value.trim();
+  const lat = parseFloat(document.getElementById('new-q-lat').value);
+  const lng = parseFloat(document.getElementById('new-q-lng').value);
+  if(!roundId){ showToast('Create a round first'); return; }
+  if(!name){ showToast('Enter a location name'); return; }
+  if(isNaN(lat)||isNaN(lng)){ showToast('Click the map to set coordinates'); return; }
+  const round = rounds.find(r=>r.id===roundId);
+  round.questions.push({name, hint, lat, lng});
+  await saveRounds();
+  document.getElementById('new-q-name').value='';
+  document.getElementById('new-q-hint').value='';
+  document.getElementById('new-q-lat').value='';
+  document.getElementById('new-q-lng').value='';
+  if(adminMap) adminMap.clearAll();
+  showToast(`Added "${name}" to ${round.title}`);
+  renderRoundsManager();
+});
+
+function renderRoundsManager(){
+  const box = document.getElementById('rounds-manager');
+  box.innerHTML='';
+  rounds.forEach(r=>{
+    const block = document.createElement('div');
+    block.className='round-block';
+    block.innerHTML = `
+      <div class="round-block-head">
+        <div>
+          <strong>${escapeHtml(r.title)}</strong>
+          <div class="pill" style="margin-top:6px;display:inline-block;">${escapeHtml(r.category||'')}</div>
+        </div>
+        <button class="btn small danger" data-round="${r.id}">Delete Round</button>
+      </div>
+      <div class="q-items"></div>
+    `;
+    const qBox = block.querySelector('.q-items');
+    r.questions.forEach((q,idx)=>{
+      const row = document.createElement('div');
+      row.className='qmini';
+      row.innerHTML = `<span>${escapeHtml(q.name)}</span>
+        <span class="qm-coord">${q.lat.toFixed(2)}, ${q.lng.toFixed(2)}</span>
+        <button class="btn small secondary" style="padding:4px 10px;" data-remove="${r.id}|${idx}">✕</button>`;
+      qBox.appendChild(row);
+    });
+    box.appendChild(block);
+  });
+  box.querySelectorAll('button[data-round]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      rounds = rounds.filter(r=>r.id!==btn.dataset.round);
+      await saveRounds();
+      showToast('Round deleted');
+      renderAdmin();
+    });
+  });
+  box.querySelectorAll('button[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const [rid, idx] = btn.dataset.remove.split('|');
+      const round = rounds.find(r=>r.id===rid);
+      round.questions.splice(parseInt(idx,10),1);
+      await saveRounds();
+      renderRoundsManager();
+    });
+  });
+}
+
+document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
+  const val = parseInt(document.getElementById('locations-per-challenge').value, 10);
+  if(isNaN(val) || val<1){ showToast('Enter a valid number of locations'); return; }
+  locationsPerChallenge = val;
+  await saveSettings();
+  showToast(`Challenges will now use ${val} locations`);
+});
+
+document.getElementById('btn-save-map-provider').addEventListener('click', async ()=>{
+  const provider = document.getElementById('map-provider').value;
+  const key = document.getElementById('map-api-key').value.trim();
+  if((provider==='google' || provider==='mapbox') && !key){
+    showToast('Add an API key/token, or switch back to OpenStreetMap'); return;
+  }
+  mapSettings = { provider, apiKey:key };
+  await saveMapSettings();
+  showToast('Map provider saved — new maps will use it on next load');
+});
+
+document.getElementById('btn-reset-defaults').addEventListener('click', async ()=>{
+  if(!confirm('Reset all rounds to the default set? This removes any custom rounds and locations.')) return;
+  rounds = JSON.parse(JSON.stringify(DEFAULT_ROUNDS));
+  await saveRounds();
+  showToast('Rounds reset to defaults');
+  renderAdmin();
+});
+
+document.getElementById('btn-clear-lb').addEventListener('click', async ()=>{
+  if(!confirm('Clear the entire leaderboard? This cannot be undone.')) return;
+  await saveLeaderboard([]);
+  showToast('Leaderboard cleared');
+});
+
+/* ===================== INIT ===================== */
+(async function init(){
+  await loadRounds();
+  await loadSettings();
+  updateStartBtn();
+})();
+
+})();
+</script>
+</body>
+</html>

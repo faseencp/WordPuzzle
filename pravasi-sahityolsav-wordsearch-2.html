@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pravasi Sahityolsav — Word Search</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --paper:#F6F1E4;
+    --paper2:#ECE1C6;
+    --ink:#2B2419;
+    --gold:#B8860B;
+    --gold-light:#D9A93C;
+    --maroon:#7A2E2E;
+    --maroon-deep:#5C2020;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:24px 14px 60px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  .header{
+    text-align:center;
+    padding:14px 16px 22px;
+    margin-bottom:22px;
+    border-top:2px solid var(--gold);
+    border-bottom:2px solid var(--gold);
+    position:relative;
+  }
+  .header svg.feather{width:30px;height:30px;fill:var(--gold);margin-bottom:4px;}
+  .header h1{
+    font-family:'Playfair Display',serif;
+    font-weight:800;
+    font-size:clamp(24px,4vw,38px);
+    color:var(--maroon-deep);
+    margin:4px 0 4px;
+  }
+  .header p{
+    margin:0;
+    font-size:12.5px;
+    letter-spacing:2.2px;
+    text-transform:uppercase;
+    color:var(--maroon);
+    font-weight:600;
+  }
+
+  .card{
+    background:var(--paper2);
+    border:1px solid rgba(43,36,25,0.14);
+    border-radius:6px;
+    padding:18px 20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-family:'Playfair Display',serif;
+    font-size:18px;
+    color:var(--maroon-deep);
+    margin:0 0 12px;
+    border-bottom:1px solid var(--gold);
+    padding-bottom:7px;
+  }
+  label{
+    display:block;
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--maroon-deep);
+    margin-top:12px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  select, textarea, input[type=text]{
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:9px 10px;
+    border:1px solid rgba(43,36,25,0.25);
+    border-radius:4px;
+    background:var(--paper);
+    color:var(--ink);
+    margin-top:6px;
+  }
+  textarea{min-height:70px;resize:vertical;}
+  .hint{font-size:12px;color:#6b5f47;margin-top:5px;}
+
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    letter-spacing:.4px;
+    padding:11px 16px;
+    border:none;
+    border-radius:5px;
+    background:var(--maroon);
+    color:var(--paper);
+    cursor:pointer;
+    transition:background .2s;
+  }
+  button:hover{background:var(--maroon-deep);}
+  button.gold{background:var(--gold);color:var(--ink);}
+  button.gold:hover{background:var(--gold-light);}
+  button.ghost{
+    background:transparent;
+    color:var(--maroon);
+    border:1px solid var(--maroon);
+  }
+  button.ghost:hover{background:rgba(122,46,46,0.08);}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+
+  .link-box{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+  .link-box input{
+    flex:1;
+    min-width:220px;
+    font-size:13px;
+    font-family:monospace;
+  }
+
+  .layout{
+    display:flex;
+    gap:26px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .board-panel{
+    background:var(--paper2);
+    border:1px solid rgba(43,36,25,0.14);
+    border-radius:6px;
+    padding:16px;
+    position:relative;
+  }
+  .board-frame{
+    border:2px solid var(--maroon);
+    border-radius:4px;
+    padding:10px;
+    background:var(--paper);
+    position:relative;
+    display:inline-block;
+  }
+  #grid, #grid2{
+    display:grid;
+    gap:2px;
+    user-select:none;
+    touch-action:none;
+  }
+  .cell{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    color:var(--ink);
+    border-radius:3px;
+    cursor:pointer;
+    position:relative;
+    z-index:1;
+    box-sizing:border-box;
+  }
+  .cell.selecting{background:rgba(184,134,11,0.35);}
+  .cell.found{background:rgba(122,46,46,0.42);color:var(--paper);}
+
+  .status-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+    font-size:13px;
+    color:var(--maroon-deep);
+    font-weight:700;
+    letter-spacing:.3px;
+  }
+  .status-row .timer{color:var(--maroon);}
+
+  .side-panel{width:250px;flex-shrink:0;}
+  #wordlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px;}
+  #wordlist li{
+    padding:5px 8px;
+    border-radius:4px;
+    background:var(--paper);
+    border:1px solid rgba(43,36,25,0.1);
+  }
+  #wordlist li.done{
+    background:var(--maroon);
+    color:var(--paper);
+    text-decoration:line-through;
+    text-decoration-color:var(--gold-light);
+  }
+
+  .win-banner{
+    display:none;
+    text-align:center;
+    font-family:'Playfair Display',serif;
+    font-size:19px;
+    color:var(--gold-light);
+    background:var(--maroon-deep);
+    padding:12px;
+    border-radius:5px;
+    margin-top:14px;
+  }
+
+  /* Waiting overlay for participants */
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(246,241,228,0.96);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    border-radius:4px;
+    z-index:5;
+    padding:20px;
+  }
+  .overlay h3{
+    font-family:'Playfair Display',serif;
+    color:var(--maroon-deep);
+    font-size:20px;
+    margin:6px 0;
+  }
+  .overlay p{font-size:13px;color:#5c5138;max-width:260px;margin:0 0 14px;}
+  .board-frame.blurred #grid, .board-frame.blurred #grid2{filter:blur(6px);pointer-events:none;}
+
+  .badge{
+    display:inline-block;
+    background:var(--gold);
+    color:var(--ink);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    padding:3px 9px;
+    border-radius:10px;
+    margin-bottom:8px;
+  }
+
+  #hostView, #playerView{display:none;}
+
+  @media print{
+    .card, .btn-row, .header p, .win-banner, .status-row .timer{display:none !important;}
+    body{padding:0;background:#fff;}
+    .layout{flex-direction:column;align-items:center;}
+    .cell.found{background:none !important;color:var(--ink) !important;}
+  }
+
+  @media (max-width:680px){
+    .side-panel{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <svg class="feather" viewBox="0 0 24 24"><path d="M20.5 2.5c-3 0-9 1.5-13 5.5-3 3-4.2 7-4.5 9.5-.1.8.5 1.5 1.3 1.4 2.5-.3 6.5-1.5 9.5-4.5 4-4 5.5-10 5.5-13 0-.5-.3-.9-.8-.9zM3 21l5-5"/></svg>
+    <h1>Pravasi Sahityolsav</h1>
+    <p>Word Search Challenge</p>
+  </div>
+
+  <!-- ===================== HOST VIEW ===================== -->
+  <div id="hostView">
+    <div class="card">
+      <h2>Create the Puzzle</h2>
+      <label for="tierSelect">Competition Tier</label>
+      <select id="tierSelect">
+        <option value="Unit">Unit Level</option>
+        <option value="Sector">Sector Level</option>
+        <option value="Zone">Zone Level</option>
+        <option value="National">National Level</option>
+      </select>
+
+      <label for="levelSelect">Category</label>
+      <select id="levelSelect">
+        <option value="junior">Junior — Std 5–8</option>
+        <option value="secondary" selected>Secondary — Std 9–12</option>
+      </select>
+
+      <label for="wordsInput">Word list (comma-separated — edit freely)</label>
+      <textarea id="wordsInput"></textarea>
+      <div class="hint" id="levelHint"></div>
+
+      <label for="sizeSelect">Grid size</label>
+      <select id="sizeSelect"></select>
+
+      <label for="waInput">Your WhatsApp number (to receive results)</label>
+      <input type="text" id="waInput" placeholder="e.g. 919876543210 (country code, no +/spaces)">
+      <div class="hint">Optional, but recommended. Participants will get a one-tap button to send you their result. Leave blank if you'd rather collect results manually.</div>
+
+      <div class="btn-row">
+        <button id="generateBtn" class="gold">Generate Fresh Puzzle Link</button>
+      </div>
+    </div>
+
+    <div class="card" id="linkCard" style="display:none;">
+      <h2>Share With Participants</h2>
+      <p class="hint">This link must be hosted online (e.g. Netlify Drop) for others to open it. Copy it and send it to everyone right before the round starts — every device that opens it gets this exact grid.</p>
+      <div class="link-box">
+        <input type="text" id="shareLink" readonly onclick="this.select()">
+        <button id="copyBtn" class="ghost">Copy Link</button>
+      </div>
+      <div class="btn-row">
+        <button id="previewBtn" class="ghost">Preview as Participant</button>
+        <button id="printBtn" class="ghost">Print This Puzzle</button>
+        <button id="newPuzzleBtn" class="ghost">Make Another</button>
+      </div>
+    </div>
+
+    <div class="layout" id="hostPreviewLayout" style="display:none;">
+      <div class="board-panel">
+        <span class="badge" id="hostBadge"></span>
+        <div class="board-frame"><div id="grid"></div></div>
+        <div class="status-row">
+          <span id="foundCount">0 / 0 found</span>
+          <span class="timer" id="timer">00:00</span>
+        </div>
+        <div class="win-banner" id="winBanner">Puzzle Complete!</div>
+      </div>
+      <div class="side-panel">
+        <div class="card">
+          <h2>Words to Find</h2>
+          <ul id="wordlist"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PLAYER VIEW ===================== -->
+  <div id="playerView">
+    <div class="layout">
+      <div class="board-panel">
+        <span class="badge" id="playerBadge"></span>
+        <div class="board-frame" id="boardFrame">
+          <div id="grid2"></div>
+          <div class="overlay" id="startOverlay">
+            <h3>Ready?</h3>
+            <p>Enter your details, wait for the signal from your host, then tap Start. Your personal timer begins the moment you click.</p>
+            <input type="text" id="playerName" placeholder="Your full name" style="max-width:220px;">
+            <input type="text" id="playerUnit" placeholder="Unit / Center name" style="max-width:220px;">
+            <button id="startBtn" class="gold" style="margin-top:12px;">Start</button>
+          </div>
+        </div>
+        <div class="status-row">
+          <span id="foundCount2">0 / 0 found</span>
+          <span class="timer" id="timer2">00:00</span>
+        </div>
+        <div class="btn-row" id="timeUpRow" style="display:none;">
+          <button id="timeUpBtn" class="ghost">Time's Up — Submit My Result</button>
+        </div>
+        <div class="win-banner" id="winBanner2">Puzzle Complete!</div>
+        <div class="card" id="resultCard" style="display:none;margin-top:14px;">
+          <h2>Your Result</h2>
+          <p id="resultSummary" style="font-size:14px;line-height:1.7;"></p>
+          <div class="btn-row">
+            <button id="sendWaBtn" class="gold">Send Result via WhatsApp</button>
+            <button id="copyResultBtn" class="ghost">Copy Result Text</button>
+          </div>
+        </div>
+      </div>
+      <div class="side-panel">
+        <div class="card">
+          <h2>Words to Find</h2>
+          <ul id="wordlist2"></ul>
+        </div>
+        <div class="card">
+          <button id="printBtn2" class="ghost" style="width:100%;">Print This Puzzle</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+
+  const LEVELS = {
+    junior: {
+      label: "Junior · Std 5–8",
+      size: 10,
+      dirs: [[0,1],[1,0]],
+      defaultWords: "BOOK, STORY, POEM, WORDS, READ, WRITE, TALE, RHYME"
+    },
+    secondary: {
+      label: "Secondary · Std 9–12",
+      size: 12,
+      dirs: [[0,1],[1,0],[1,1],[-1,1]],
+      defaultWords: "NOVEL, AUTHOR, POETRY, DRAMA, CULTURE, LANGUAGE, HERITAGE, NARRATIVE, PUBLISH, LIBRARY, CHAPTER, DIALECT"
+    }
+  };
+  const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  // ---------- seeded RNG ----------
+  function cyrb53(str, seed){
+    let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+    for(let i=0;i<str.length;i++){
+      const ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1>>>0)) % 2147483647;
+  }
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function cleanWords(raw){
+    return raw.split(',')
+      .map(w => w.trim().toUpperCase().replace(/[^A-Z]/g,''))
+      .filter(w => w.length >= 2);
+  }
+
+  function buildPuzzle(levelKey, wordsRaw, size, seedStr){
+    const level = LEVELS[levelKey] || LEVELS.secondary;
+    const rng = mulberry32(cyrb53(seedStr, 0));
+    let words = cleanWords(wordsRaw).sort((a,b)=> b.length - a.length || (a<b?-1:1));
+    words = words.filter(w => w.length <= size);
+
+    function shuffled(arr){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(rng()*(i+1));
+        [a[i],a[j]]=[a[j],a[i]];
+      }
+      return a;
+    }
+
+    let grid, placements;
+    let tries = 0, success = false;
+    while(!success && tries < 30){
+      tries++;
+      grid = Array.from({length:size}, () => Array(size).fill(null));
+      placements = [];
+      for(const w of words){
+        const dirs = shuffled(level.dirs);
+        let placed = null;
+        for(const [dr,dc] of dirs){
+          for(let a=0;a<50 && !placed;a++){
+            const r0 = Math.floor(rng()*size);
+            const c0 = Math.floor(rng()*size);
+            const rEnd = r0 + dr*(w.length-1);
+            const cEnd = c0 + dc*(w.length-1);
+            if(rEnd<0||rEnd>=size||cEnd<0||cEnd>=size) continue;
+            let ok = true;
+            const cells = [];
+            for(let i=0;i<w.length;i++){
+              const r=r0+dr*i, c=c0+dc*i;
+              const ex = grid[r][c];
+              if(ex!==null && ex!==w[i]){ok=false;break;}
+              cells.push([r,c]);
+            }
+            if(!ok) continue;
+            cells.forEach(([r,c],i)=>{grid[r][c]=w[i];});
+            placed = cells;
+          }
+          if(placed) break;
+        }
+        if(placed) placements.push({word:w, cells:placed});
+      }
+      if(placements.length === words.length || tries===29) success = true;
+    }
+    for(let r=0;r<size;r++) for(let c=0;c<size;c++){
+      if(grid[r][c]===null) grid[r][c] = ALPHA[Math.floor(rng()*26)];
+    }
+    return {grid, placements, size, level};
+  }
+
+  // ---------- shared render/interaction logic ----------
+  function mountPuzzle(gridElId, wordlistElId, foundCountElId, timerElId, winBannerElId, puzzle, opts){
+    opts = opts || {};
+    const gridEl = document.getElementById(gridElId);
+    const wordlistEl = document.getElementById(wordlistElId);
+    const foundCountEl = document.getElementById(foundCountElId);
+    const timerEl = document.getElementById(timerElId);
+    const winBanner = document.getElementById(winBannerElId);
+
+    const {grid, placements, size} = puzzle;
+    let cellEls = [], foundWords = new Set(), timerInterval = null, seconds = 0, started = false;
+
+    // Fixed pixel sizing (avoids relying on 1fr/aspect-ratio, which some
+    // in-app browsers such as WhatsApp/Gmail webviews miscalculate).
+    const viewportWidth = (window.innerWidth || document.documentElement.clientWidth || 360);
+    const availableWidth = Math.min(Math.max(viewportWidth - 56, 220), 460);
+    const gapPx = 2;
+    let cellPx = Math.floor((availableWidth - gapPx*(size-1)) / size);
+    cellPx = Math.max(16, Math.min(cellPx, 38));
+    const totalPx = cellPx*size + gapPx*(size-1);
+
+    gridEl.style.gridTemplateColumns = `repeat(${size}, ${cellPx}px)`;
+    gridEl.style.gridAutoRows = `${cellPx}px`;
+    gridEl.style.width = totalPx+'px';
+    gridEl.style.maxWidth = 'none';
+    gridEl.style.margin = '0 auto';
+    gridEl.innerHTML = '';
+    const fontPx = Math.max(10, Math.floor(cellPx*0.5));
+    for(let r=0;r<size;r++){
+      const row = [];
+      for(let c=0;c<size;c++){
+        const div = document.createElement('div');
+        div.className='cell';
+        div.style.width = cellPx+'px';
+        div.style.height = cellPx+'px';
+        div.style.fontSize = fontPx+'px';
+        div.textContent = grid[r][c];
+        div.dataset.r=r; div.dataset.c=c;
+        gridEl.appendChild(div);
+        row.push(div);
+      }
+      cellEls.push(row);
+    }
+    wordlistEl.innerHTML = '';
+    placements.forEach(p=>{
+      const li = document.createElement('li');
+      li.textContent = p.word.charAt(0)+p.word.slice(1).toLowerCase();
+      li.dataset.word = p.word;
+      wordlistEl.appendChild(li);
+    });
+    foundCountEl.textContent = `0 / ${placements.length} found`;
+
+    function startTimer(){
+      if(started) return;
+      started = true;
+      timerInterval = setInterval(()=>{
+        seconds++;
+        const m=String(Math.floor(seconds/60)).padStart(2,'0');
+        const s=String(seconds%60).padStart(2,'0');
+        timerEl.textContent = `${m}:${s}`;
+      },1000);
+    }
+    if(opts.autoStart) startTimer();
+
+    let selecting=false, startCell=null, currentSelected=[];
+    function cellFromEvent(e){
+      let t = e.target;
+      if(e.touches && e.touches.length){
+        t = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      }
+      if(!t || !t.classList || !t.classList.contains('cell')) return null;
+      return t;
+    }
+    function clearSel(){ currentSelected.forEach(el=>el.classList.remove('selecting')); currentSelected=[]; }
+    function lineCells(r0,c0,r1,c1){
+      if(r0!==r1 && c0!==c1 && Math.abs(r1-r0)!==Math.abs(c1-c0)) return null;
+      const dr=Math.sign(r1-r0), dc=Math.sign(c1-c0);
+      const len = Math.max(Math.abs(r1-r0),Math.abs(c1-c0))+1;
+      const cells=[];
+      for(let i=0;i<len;i++){
+        const r=r0+dr*i, c=c0+dc*i;
+        if(r<0||r>=size||c<0||c>=size) return null;
+        cells.push([r,c]);
+      }
+      return cells;
+    }
+    function handleStart(e){
+      if(opts.locked && opts.locked()) return;
+      const cell = cellFromEvent(e);
+      if(!cell) return;
+      e.preventDefault();
+      startTimer();
+      selecting=true; startCell=cell;
+      clearSel();
+      cell.classList.add('selecting');
+      currentSelected=[cell];
+    }
+    function handleMove(e){
+      if(!selecting || !startCell) return;
+      const cell = cellFromEvent(e);
+      if(!cell) return;
+      e.preventDefault();
+      const r0=+startCell.dataset.r, c0=+startCell.dataset.c;
+      const r1=+cell.dataset.r, c1=+cell.dataset.c;
+      const cells = lineCells(r0,c0,r1,c1);
+      clearSel();
+      if(cells){
+        cells.forEach(([r,c])=>{ const el=cellEls[r][c]; el.classList.add('selecting'); currentSelected.push(el); });
+      } else {
+        startCell.classList.add('selecting'); currentSelected=[startCell];
+      }
+    }
+    function handleEnd(){
+      if(!selecting) return;
+      selecting=false;
+      check();
+      clearSel();
+      startCell=null;
+    }
+    function check(){
+      if(currentSelected.length<2) return;
+      const coords = currentSelected.map(el=>[+el.dataset.r,+el.dataset.c]);
+      const letters = coords.map(([r,c])=>grid[r][c]).join('');
+      const rev = letters.split('').reverse().join('');
+      for(const p of placements){
+        if(foundWords.has(p.word)) continue;
+        if((p.word===letters || p.word===rev) && coords.length===p.cells.length){
+          foundWords.add(p.word);
+          p.cells.forEach(([r,c])=>cellEls[r][c].classList.add('found'));
+          const li = wordlistEl.querySelector(`li[data-word="${p.word}"]`);
+          if(li) li.classList.add('done');
+          foundCountEl.textContent = `${foundWords.size} / ${placements.length} found`;
+          if(foundWords.size===placements.length){
+            clearInterval(timerInterval);
+            winBanner.style.display='block';
+            if(opts.onComplete) opts.onComplete({found:foundWords.size, total:placements.length, seconds});
+          }
+          return;
+        }
+      }
+    }
+    gridEl.addEventListener('mousedown', handleStart);
+    gridEl.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+    gridEl.addEventListener('touchstart', handleStart, {passive:false});
+    gridEl.addEventListener('touchmove', handleMove, {passive:false});
+    gridEl.addEventListener('touchend', handleEnd);
+
+    return {
+      startTimer,
+      stop: () => clearInterval(timerInterval),
+      getState: () => ({found: foundWords.size, total: placements.length, seconds})
+    };
+  }
+
+  // ---------- routing: host vs player ----------
+  const params = new URLSearchParams(window.location.search);
+  const hasPuzzleParams = params.has('seed') && params.has('level') && params.has('words');
+
+  if(hasPuzzleParams){
+    // ============ PLAYER VIEW ============
+    document.getElementById('playerView').style.display='block';
+    const levelKey = params.get('level');
+    const size = parseInt(params.get('size'),10) || (LEVELS[levelKey]||LEVELS.secondary).size;
+    const words = decodeURIComponent(params.get('words'));
+    const seed = params.get('seed');
+    const puzzle = buildPuzzle(levelKey, words, size, seed);
+
+    const tierLabel = params.get('tier');
+    const waNumber = params.get('wa') || '';
+    document.getElementById('playerBadge').textContent = (tierLabel ? tierLabel + ' Level · ' : '') + puzzle.level.label + ' · Grid ' + size + '×' + size;
+
+    let locked = true;
+    let playerName = '', playerUnit = '';
+    document.getElementById('boardFrame').classList.add('blurred');
+    const controller = mountPuzzle('grid2','wordlist2','foundCount2','timer2','winBanner2', puzzle, {
+      autoStart:false,
+      locked: () => locked,
+      onComplete: (state) => showResult(state, true)
+    });
+
+    function fmtTime(s){
+      const m=String(Math.floor(s/60)).padStart(2,'0');
+      const sec=String(s%60).padStart(2,'0');
+      return `${m}:${sec}`;
+    }
+
+    function showResult(state, completed){
+      document.getElementById('timeUpRow').style.display='none';
+      const card = document.getElementById('resultCard');
+      const summary = document.getElementById('resultSummary');
+      const statusLine = completed
+        ? `Completed all ${state.total} words`
+        : `Found ${state.found} of ${state.total} words (time called)`;
+      summary.innerHTML =
+        `<strong>${playerName || '(no name entered)'}</strong> — ${playerUnit || 'no unit entered'}<br>`+
+        `${tierLabel ? tierLabel+' Level · ' : ''}${puzzle.level.label}<br>`+
+        `${statusLine}<br>`+
+        `Time: ${fmtTime(state.seconds)}`;
+      card.style.display='block';
+
+      const msgText = `Word Search Result\n`+
+        `Name: ${playerName}\n`+
+        `Unit: ${playerUnit}\n`+
+        `Tier: ${tierLabel || '-'}\n`+
+        `Category: ${puzzle.level.label}\n`+
+        `Words found: ${state.found}/${state.total}\n`+
+        `Time: ${fmtTime(state.seconds)}\n`+
+        `Status: ${completed ? 'Completed' : 'Time called'}`;
+
+      document.getElementById('sendWaBtn').onclick = () => {
+        const encoded = encodeURIComponent(msgText);
+        const target = waNumber ? `https://wa.me/${waNumber}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+        window.open(target, '_blank');
+      };
+      document.getElementById('copyResultBtn').onclick = () => {
+        navigator.clipboard?.writeText(msgText).catch(()=>{});
+        const btn = document.getElementById('copyResultBtn');
+        const old = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(()=>btn.textContent = old, 1500);
+      };
+    }
+
+    document.getElementById('startBtn').addEventListener('click', ()=>{
+      playerName = document.getElementById('playerName').value.trim();
+      playerUnit = document.getElementById('playerUnit').value.trim();
+      if(!playerName){
+        document.getElementById('playerName').style.borderColor = 'var(--maroon)';
+        document.getElementById('playerName').focus();
+        return;
+      }
+      locked = false;
+      document.getElementById('boardFrame').classList.remove('blurred');
+      document.getElementById('startOverlay').style.display='none';
+      document.getElementById('timeUpRow').style.display='flex';
+      controller.startTimer();
+    });
+    document.getElementById('timeUpBtn').addEventListener('click', ()=>{
+      controller.stop();
+      showResult(controller.getState(), false);
+    });
+    document.getElementById('printBtn2').addEventListener('click', ()=>window.print());
+
+  } else {
+    // ============ HOST VIEW ============
+    document.getElementById('hostView').style.display='block';
+    const levelSelect = document.getElementById('levelSelect');
+    const wordsInput = document.getElementById('wordsInput');
+    const sizeSelect = document.getElementById('sizeSelect');
+    const levelHint = document.getElementById('levelHint');
+
+    function refreshLevelDefaults(){
+      const lv = LEVELS[levelSelect.value];
+      wordsInput.value = lv.defaultWords;
+      sizeSelect.innerHTML = '';
+      [10,12,14,15,16,18].forEach(s=>{
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = s+' × '+s;
+        if(s===lv.size) opt.selected = true;
+        sizeSelect.appendChild(opt);
+      });
+      levelHint.textContent = `Default word set for ${lv.label}. Edit above if you'd like different words — grid updates automatically.`;
+    }
+    levelSelect.addEventListener('change', refreshLevelDefaults);
+    refreshLevelDefaults();
+
+    let currentPuzzle = null, currentLevelKey = null;
+
+    function doGenerate(){
+      const levelKey = levelSelect.value;
+      const size = parseInt(sizeSelect.value,10);
+      const wordsRaw = wordsInput.value;
+      const seed = 's' + Date.now().toString(36) + Math.floor(Math.random()*1e4).toString(36);
+
+      const url = new URL(window.location.href.split('?')[0]);
+      const tier = document.getElementById('tierSelect').value;
+      url.searchParams.set('level', levelKey);
+      url.searchParams.set('size', size);
+      url.searchParams.set('seed', seed);
+      url.searchParams.set('tier', tier);
+      const waNum = document.getElementById('waInput').value.replace(/[^0-9]/g,'');
+      if(waNum) url.searchParams.set('wa', waNum);
+      url.searchParams.set('words', encodeURIComponent(cleanWords(wordsRaw).join(',')));
+
+      document.getElementById('shareLink').value = url.toString();
+      document.getElementById('linkCard').style.display='block';
+
+      currentPuzzle = buildPuzzle(levelKey, wordsRaw, size, seed);
+      currentLevelKey = levelKey;
+      document.getElementById('hostPreviewLayout').style.display='flex';
+      document.getElementById('hostBadge').textContent = tier + ' Level · ' + currentPuzzle.level.label + ' · Grid ' + size + '×' + size + ' · Preview only';
+      mountPuzzle('grid','wordlist','foundCount','timer','winBanner', currentPuzzle, {autoStart:false});
+      document.getElementById('previewBtn').onclick = ()=> window.open(url.toString(), '_blank');
+    }
+
+    document.getElementById('generateBtn').addEventListener('click', doGenerate);
+    document.getElementById('copyBtn').addEventListener('click', ()=>{
+      const input = document.getElementById('shareLink');
+      input.select();
+      try{ document.execCommand('copy'); }catch(e){}
+      if(navigator.clipboard) navigator.clipboard.writeText(input.value).catch(()=>{});
+      const btn = document.getElementById('copyBtn');
+      const old = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(()=>btn.textContent = old, 1500);
+    });
+    document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+    document.getElementById('newPuzzleBtn').addEventListener('click', doGenerate);
+  }
+})();
+</script>
+</body>
+</html>

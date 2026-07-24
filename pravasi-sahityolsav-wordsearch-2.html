@@ -297,6 +297,14 @@
       <input type="text" id="waInput" placeholder="e.g. 919876543210 (country code, no +/spaces)">
       <div class="hint">Optional, but recommended. Participants will get a one-tap button to send you their result. Leave blank if you'd rather collect results manually.</div>
 
+      <label for="participantCountInput">Expected number of participants</label>
+      <input type="text" inputmode="numeric" id="participantCountInput" placeholder="e.g. 30">
+      <div class="hint">Generates that many participant codes (WSC-01, WSC-02, …) ahead of time — hand these out before the round instead of participants typing their own name.</div>
+
+      <label for="hostKeyInput">Host key</label>
+      <input type="password" id="hostKeyInput" placeholder="Shared secret configured on the server">
+      <div class="hint" id="hostKeyHint">Required to create rounds and trigger the synchronized start. Set once — remembered on this device.</div>
+
       <div class="btn-row">
         <button id="generateBtn" class="gold">Generate Fresh Puzzle Link</button>
       </div>
@@ -304,7 +312,7 @@
 
     <div class="card" id="linkCard" style="display:none;">
       <h2>Share With Participants</h2>
-      <p class="hint">This link must be hosted online (e.g. Netlify Drop) for others to open it. Copy it and send it to everyone right before the round starts — every device that opens it gets this exact grid.</p>
+      <p class="hint">Copy this link and send it to everyone right before the round starts — every device that opens it gets this exact grid.</p>
       <div class="link-box">
         <input type="text" id="shareLink" readonly onclick="this.select()">
         <button id="copyBtn" class="ghost">Copy Link</button>
@@ -313,6 +321,23 @@
         <button id="previewBtn" class="ghost">Preview as Participant</button>
         <button id="printBtn" class="ghost">Print This Puzzle</button>
         <button id="newPuzzleBtn" class="ghost">Make Another</button>
+      </div>
+    </div>
+
+    <div class="card" id="codesCard" style="display:none;">
+      <h2>Participant Codes</h2>
+      <p class="hint" id="codesStatus"></p>
+      <ul id="codesList" style="list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;font-family:monospace;font-size:13px;"></ul>
+      <div class="btn-row">
+        <button id="printCodesBtn" class="ghost">Print Codes</button>
+      </div>
+    </div>
+
+    <div class="card" id="syncStartCard" style="display:none;">
+      <h2>Round Control</h2>
+      <p class="hint" id="syncStartStatus">Codes are handed out. When every participant has the link open and is waiting, trigger the synchronized start below — every device counts down together.</p>
+      <div class="btn-row">
+        <button id="startRoundBtn" class="gold">Start Round Now</button>
       </div>
     </div>
 
@@ -331,6 +356,11 @@
           <h2>Words to Find</h2>
           <ul id="wordlist"></ul>
         </div>
+        <div class="card" id="leaderboardCard1" style="display:none;">
+          <h2>Live Leaderboard</h2>
+          <p class="hint" id="leaderboardStatus1">Updates automatically as participants finish.</p>
+          <ol id="leaderboardList1" style="margin:10px 0 0;padding-left:20px;font-size:13.5px;line-height:1.9;"></ol>
+        </div>
       </div>
     </div>
   </div>
@@ -344,10 +374,15 @@
           <div id="grid2"></div>
           <div class="overlay" id="startOverlay">
             <h3>Ready?</h3>
-            <p>Enter your details, wait for the signal from your host, then tap Start. Your personal timer begins the moment you click.</p>
-            <input type="text" id="playerName" placeholder="Your full name" style="max-width:220px;">
+            <p id="startOverlayHint">Enter your assigned participant code and unit, then wait for your host to start the round. Everyone begins at the same synchronized moment.</p>
+            <input type="text" id="playerCode" placeholder="Your code (e.g. WSC-07)" style="max-width:220px;text-transform:uppercase;">
             <input type="text" id="playerUnit" placeholder="Unit / Center name" style="max-width:220px;">
-            <button id="startBtn" class="gold" style="margin-top:12px;">Start</button>
+            <button id="startBtn" class="gold" style="margin-top:12px;">Submit Code</button>
+            <div id="waitingRow" style="display:none;margin-top:14px;">
+              <div class="badge">Waiting for host</div>
+              <p style="font-size:13px;color:#5c5138;margin:4px 0 0;">Your code is confirmed. The board unlocks the instant your host starts the round.</p>
+              <div id="countdownDisplay" style="font-family:'Playfair Display',serif;font-size:34px;color:var(--maroon-deep);margin-top:8px;"></div>
+            </div>
           </div>
         </div>
         <div class="status-row">
@@ -375,6 +410,11 @@
         <div class="card">
           <button id="printBtn2" class="ghost" style="width:100%;">Print This Puzzle</button>
         </div>
+        <div class="card" id="leaderboardCard2">
+          <h2>Live Leaderboard</h2>
+          <p class="hint" id="leaderboardStatus2">Updates automatically as participants finish.</p>
+          <ol id="leaderboardList2" style="margin:10px 0 0;padding-left:20px;font-size:13.5px;line-height:1.9;"></ol>
+        </div>
       </div>
     </div>
   </div>
@@ -383,6 +423,28 @@
 
 <script>
 (function(){
+
+  // Backend deployed as an IIS Application under /wordpuzzle/api — see deploy notes.
+  // Hardcoded rather than derived from location.pathname so this still works
+  // regardless of which exact filename this page is served as.
+  const API_BASE = '/wordpuzzle/api';
+
+  async function apiCall(path, body){
+    const res = await fetch(API_BASE + path, {
+      method: body ? 'POST' : 'GET',
+      headers: body ? {'Content-Type':'application/json'} : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    let data = null;
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok){
+      const err = new Error((data && data.title) || res.statusText || ('HTTP ' + res.status));
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
 
   const LEVELS = {
     junior: {
@@ -637,6 +699,36 @@
     };
   }
 
+  // ---------- shared live leaderboard polling (host preview + player view) ----------
+  function mountLeaderboard(seed, listElId, statusElId, intervalMs){
+    const listEl = document.getElementById(listElId);
+    const statusEl = document.getElementById(statusElId);
+    function fmtTime(s){
+      const m=String(Math.floor(s/60)).padStart(2,'0');
+      const sec=String(s%60).padStart(2,'0');
+      return `${m}:${sec}`;
+    }
+    async function refresh(){
+      try{
+        const rows = await apiCall('/rounds/' + encodeURIComponent(seed) + '/leaderboard');
+        if(!rows || rows.length===0){
+          listEl.innerHTML = '';
+          statusEl.textContent = 'No results submitted yet.';
+          return;
+        }
+        statusEl.textContent = 'Updates automatically as participants finish.';
+        listEl.innerHTML = rows.map(r =>
+          `<li><strong>${(r.unit||'Unknown').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</strong> — ${r.wordsFound}/${r.totalWords} words · ${fmtTime(r.timeSeconds)}</li>`
+        ).join('');
+      }catch(e){
+        statusEl.textContent = 'Leaderboard unavailable right now.';
+      }
+    }
+    refresh();
+    const handle = setInterval(refresh, intervalMs || 4000);
+    return { stop: () => clearInterval(handle) };
+  }
+
   // ---------- routing: host vs player ----------
   const params = new URLSearchParams(window.location.search);
   const hasPuzzleParams = params.has('seed') && params.has('level') && params.has('words');
@@ -655,18 +747,36 @@
     document.getElementById('playerBadge').textContent = (tierLabel ? tierLabel + ' Level · ' : '') + puzzle.level.label + ' · Grid ' + size + '×' + size;
 
     let locked = true;
-    let playerName = '', playerUnit = '';
+    let playerCode = '', playerUnit = '';
     document.getElementById('boardFrame').classList.add('blurred');
     const controller = mountPuzzle('grid2','wordlist2','foundCount2','timer2','winBanner2', puzzle, {
       autoStart:false,
       locked: () => locked,
-      onComplete: (state) => showResult(state, true)
+      onComplete: (state) => { showResult(state, true); submitResult(state); }
     });
+    mountLeaderboard(seed, 'leaderboardList2', 'leaderboardStatus2');
 
     function fmtTime(s){
       const m=String(Math.floor(s/60)).padStart(2,'0');
       const sec=String(s%60).padStart(2,'0');
       return `${m}:${sec}`;
+    }
+
+    let resultSubmitted = false;
+    async function submitResult(state){
+      if(resultSubmitted) return;
+      resultSubmitted = true;
+      try{
+        const res = await apiCall('/rounds/' + encodeURIComponent(seed) + '/results', {
+          code: playerCode, wordsFound: state.found, totalWords: state.total, timeSeconds: state.seconds
+        });
+        const rankEl = document.getElementById('resultRank');
+        if(rankEl && res) rankEl.textContent = `Rank on leaderboard: #${res.rank}`;
+      }catch(e){
+        // Non-fatal — WhatsApp/copy buttons below remain as the backup submission path.
+        const rankEl = document.getElementById('resultRank');
+        if(rankEl) rankEl.textContent = 'Could not reach the leaderboard server — use the WhatsApp/copy buttons below as backup.';
+      }
     }
 
     function showResult(state, completed){
@@ -677,14 +787,15 @@
         ? `Completed all ${state.total} words`
         : `Found ${state.found} of ${state.total} words (time called)`;
       summary.innerHTML =
-        `<strong>${playerName || '(no name entered)'}</strong> — ${playerUnit || 'no unit entered'}<br>`+
+        `<strong>${playerCode}</strong> — ${playerUnit || 'no unit entered'}<br>`+
         `${tierLabel ? tierLabel+' Level · ' : ''}${puzzle.level.label}<br>`+
         `${statusLine}<br>`+
-        `Time: ${fmtTime(state.seconds)}`;
+        `Time: ${fmtTime(state.seconds)}<br>`+
+        `<span id="resultRank">Submitting to leaderboard…</span>`;
       card.style.display='block';
 
       const msgText = `Word Search Result\n`+
-        `Name: ${playerName}\n`+
+        `Code: ${playerCode}\n`+
         `Unit: ${playerUnit}\n`+
         `Tier: ${tierLabel || '-'}\n`+
         `Category: ${puzzle.level.label}\n`+
@@ -706,23 +817,85 @@
       };
     }
 
-    document.getElementById('startBtn').addEventListener('click', ()=>{
-      playerName = document.getElementById('playerName').value.trim();
-      playerUnit = document.getElementById('playerUnit').value.trim();
-      if(!playerName){
-        document.getElementById('playerName').style.borderColor = 'var(--maroon)';
-        document.getElementById('playerName').focus();
-        return;
-      }
+    // ---- synchronized start: claim code, then poll for the host's go-signal ----
+    let statusPollHandle = null, countdownHandle = null;
+
+    function beginPuzzleNow(){
       locked = false;
       document.getElementById('boardFrame').classList.remove('blurred');
       document.getElementById('startOverlay').style.display='none';
       document.getElementById('timeUpRow').style.display='flex';
       controller.startTimer();
+    }
+
+    function pollForStart(){
+      statusPollHandle = setInterval(async ()=>{
+        try{
+          const res = await apiCall('/rounds/' + encodeURIComponent(seed) + '/status');
+          if(!res.startedAtUtc) return;
+          clearInterval(statusPollHandle);
+          // Correct for this device's clock skew vs the server, so every
+          // participant counts down to the same real-world instant even if
+          // their local clocks disagree.
+          const skewMs = new Date(res.serverTimeUtc).getTime() - Date.now();
+          const targetLocalMs = new Date(res.startedAtUtc).getTime() - skewMs;
+          const countdownEl = document.getElementById('countdownDisplay');
+          countdownHandle = setInterval(()=>{
+            const remaining = Math.ceil((targetLocalMs - Date.now())/1000);
+            if(remaining <= 0){
+              clearInterval(countdownHandle);
+              countdownEl.textContent = '';
+              beginPuzzleNow();
+            }else{
+              countdownEl.textContent = String(remaining);
+            }
+          }, 150);
+        }catch(e){ /* transient network hiccup — next poll retries */ }
+      }, 1000);
+    }
+
+    document.getElementById('startBtn').addEventListener('click', async ()=>{
+      const codeInput = document.getElementById('playerCode');
+      const unitInput = document.getElementById('playerUnit');
+      const code = codeInput.value.trim().toUpperCase();
+      const unit = unitInput.value.trim();
+      if(!code){
+        codeInput.style.borderColor = 'var(--maroon)';
+        codeInput.focus();
+        return;
+      }
+      if(!unit){
+        unitInput.style.borderColor = 'var(--maroon)';
+        unitInput.focus();
+        return;
+      }
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      btn.textContent = 'Checking code…';
+      try{
+        await apiCall('/rounds/' + encodeURIComponent(seed) + '/claim', { code, unit });
+        playerCode = code;
+        playerUnit = unit;
+        codeInput.disabled = true;
+        unitInput.disabled = true;
+        btn.style.display = 'none';
+        document.getElementById('waitingRow').style.display = 'block';
+        pollForStart();
+      }catch(e){
+        btn.disabled = false;
+        btn.textContent = 'Submit Code';
+        const hint = document.getElementById('startOverlayHint');
+        if(e.status === 409) hint.textContent = 'That code has already been claimed by someone else — check with your host.';
+        else if(e.status === 404) hint.textContent = 'Unrecognized code for this round — double-check it and try again.';
+        else hint.textContent = 'Could not reach the round server — check your connection and try again.';
+        hint.style.color = 'var(--maroon)';
+      }
     });
     document.getElementById('timeUpBtn').addEventListener('click', ()=>{
       controller.stop();
-      showResult(controller.getState(), false);
+      const state = controller.getState();
+      showResult(state, false);
+      submitResult(state);
     });
     document.getElementById('printBtn2').addEventListener('click', ()=>window.print());
 
@@ -749,7 +922,31 @@
     levelSelect.addEventListener('change', refreshLevelDefaults);
     refreshLevelDefaults();
 
-    let currentPuzzle = null, currentLevelKey = null;
+    const hostKeyInput = document.getElementById('hostKeyInput');
+    hostKeyInput.value = localStorage.getItem('wordpuzzle_host_key') || '';
+
+    let currentPuzzle = null, currentLevelKey = null, currentSeed = null;
+    let hostLeaderboard = null;
+
+    function printCodes(seed, tier, codes){
+      const w = window.open('', '_blank');
+      if(!w) return;
+      const rows = codes.map(c => `<div class="code-cell">${c}</div>`).join('');
+      w.document.write(`<!DOCTYPE html><html><head><title>Participant Codes — ${seed}</title>
+        <style>
+          body{font-family:sans-serif;padding:24px;}
+          h1{font-size:18px;}
+          .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px;}
+          .code-cell{border:1px solid #999;border-radius:4px;padding:10px;text-align:center;font-family:monospace;font-size:16px;}
+        </style></head><body>
+        <h1>${tier} Level — Participant Codes (${codes.length})</h1>
+        <p>Seed: ${seed}</p>
+        <div class="grid">${rows}</div>
+        </body></html>`);
+      w.document.close();
+      w.focus();
+      w.print();
+    }
 
     function doGenerate(){
       const levelKey = levelSelect.value;
@@ -772,10 +969,81 @@
 
       currentPuzzle = buildPuzzle(levelKey, wordsRaw, size, seed);
       currentLevelKey = levelKey;
+      currentSeed = seed;
       document.getElementById('hostPreviewLayout').style.display='flex';
       document.getElementById('hostBadge').textContent = tier + ' Level · ' + currentPuzzle.level.label + ' · Grid ' + size + '×' + size + ' · Preview only';
       mountPuzzle('grid','wordlist','foundCount','timer','winBanner', currentPuzzle, {autoStart:false});
       document.getElementById('previewBtn').onclick = ()=> window.open(url.toString(), '_blank');
+
+      // Reset round-control UI for the fresh puzzle before registering it server-side.
+      document.getElementById('codesCard').style.display = 'none';
+      document.getElementById('syncStartCard').style.display = 'none';
+      const startBtn = document.getElementById('startRoundBtn');
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start Round Now';
+      document.getElementById('syncStartStatus').textContent =
+        'Codes are handed out. When every participant has the link open and is waiting, trigger the synchronized start below — every device counts down together.';
+      if(hostLeaderboard){ hostLeaderboard.stop(); hostLeaderboard = null; }
+      document.getElementById('leaderboardCard1').style.display = 'none';
+
+      registerRoundOnServer(seed, tier, levelKey, size, wordsRaw);
+    }
+
+    async function registerRoundOnServer(seed, tier, levelKey, size, wordsRaw){
+      const hostKey = hostKeyInput.value.trim();
+      const participantCount = parseInt(document.getElementById('participantCountInput').value, 10);
+      const codesStatus = document.getElementById('codesStatus');
+
+      if(!hostKey){
+        document.getElementById('hostKeyHint').textContent = 'Enter the host key to enable participant codes, synchronized start, and the live leaderboard — the link above still works without it, but as a self-paced puzzle only.';
+        document.getElementById('hostKeyHint').style.color = 'var(--maroon)';
+        return;
+      }
+      if(!participantCount || participantCount < 1){
+        codesStatus.textContent = 'Enter a valid expected participant count above, then click "Make Another" to register the round.';
+        codesStatus.style.color = 'var(--maroon)';
+        document.getElementById('codesCard').style.display = 'block';
+        return;
+      }
+
+      localStorage.setItem('wordpuzzle_host_key', hostKey);
+
+      try{
+        const res = await apiCall('/rounds', {
+          seed, tier, category: levelKey, gridSize: size,
+          words: cleanWords(wordsRaw), participantCount, hostKey
+        });
+        document.getElementById('codesCard').style.display = 'block';
+        codesStatus.style.color = '';
+        codesStatus.textContent = `${res.codes.length} codes generated. Hand these out before the round starts.`;
+        document.getElementById('codesList').innerHTML = res.codes.map(c => `<li>${c}</li>`).join('');
+        document.getElementById('printCodesBtn').onclick = () => printCodes(seed, tier, res.codes);
+
+        document.getElementById('syncStartCard').style.display = 'block';
+        document.getElementById('startRoundBtn').onclick = async () => {
+          const btn = document.getElementById('startRoundBtn');
+          btn.disabled = true;
+          btn.textContent = 'Starting…';
+          try{
+            await apiCall('/rounds/' + encodeURIComponent(seed) + '/start', { hostKey });
+            btn.textContent = 'Round Started';
+            document.getElementById('syncStartStatus').textContent = 'Go signal sent — participant devices are counting down now.';
+          }catch(e){
+            btn.disabled = false;
+            btn.textContent = 'Start Round Now';
+            document.getElementById('syncStartStatus').textContent = 'Could not reach the round server — check your connection and try again.';
+            document.getElementById('syncStartStatus').style.color = 'var(--maroon)';
+          }
+        };
+
+        document.getElementById('leaderboardCard1').style.display = 'block';
+        hostLeaderboard = mountLeaderboard(seed, 'leaderboardList1', 'leaderboardStatus1');
+      }catch(e){
+        codesStatus.style.color = 'var(--maroon)';
+        if(e.status === 401) codesStatus.textContent = 'Host key was rejected by the server — check it and click "Make Another" to retry.';
+        else codesStatus.textContent = 'Could not reach the round server — participant codes and synchronized start are unavailable, but the puzzle link above still works as a self-paced fallback.';
+        document.getElementById('codesCard').style.display = 'block';
+      }
     }
 
     document.getElementById('generateBtn').addEventListener('click', doGenerate);

@@ -62,7 +62,7 @@ public static class ResultsEndpoints
         using var conn = db.Open();
 
         var rows = await conn.QueryAsync<LeaderboardRowRaw>(
-            @"SELECT pc.ClaimedUnit AS Unit, r.WordsFound, r.TotalWords, r.TimeSeconds
+            @"SELECT pc.Code, r.WordsFound, r.TotalWords, r.TimeSeconds
               FROM dbo.Results r
               JOIN dbo.ParticipantCodes pc ON pc.Id = r.ParticipantCodeId
               WHERE r.Seed = @seed
@@ -70,10 +70,10 @@ public static class ResultsEndpoints
             new { seed });
 
         var ranked = rows.Select((row, i) => new LeaderboardRow(
-            i + 1, row.Unit ?? "", row.WordsFound, row.TotalWords, row.TimeSeconds));
+            i + 1, row.Code, row.WordsFound, row.TotalWords, row.TimeSeconds));
 
         return Results.Ok(ranked);
     }
 
-    private record LeaderboardRowRaw(string? Unit, int WordsFound, int TotalWords, int TimeSeconds);
+    private record LeaderboardRowRaw(string Code, int WordsFound, int TotalWords, int TimeSeconds);
 }

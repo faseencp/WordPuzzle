@@ -54,7 +54,7 @@ public record StartRoundResponse(DateTime StartedAtUtc);
 
 public record RoundStatusResponse(byte Status, DateTime? StartedAtUtc, DateTime ServerTimeUtc);
 
-public record ClaimRequest(string Code, string Unit, string? Name);
+public record ClaimRequest(string Code);
 
 public record ClaimResponse(bool Claimed, int ParticipantCodeId);
 
@@ -62,4 +62,4 @@ public record SubmitResultRequest(string Code, int WordsFound, int TotalWords, i
 
 public record SubmitResultResponse(bool Accepted, int Rank);
 
-public record LeaderboardRow(int Rank, string Unit, int WordsFound, int TotalWords, int TimeSeconds);
+public record LeaderboardRow(int Rank, string Code, int WordsFound, int TotalWords, int TimeSeconds);

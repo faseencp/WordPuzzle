@@ -302,7 +302,7 @@
       <div class="hint">Generates that many participant codes (WSC-01, WSC-02, …) ahead of time — hand these out before the round instead of participants typing their own name.</div>
 
       <label for="hostKeyInput">Host key</label>
-      <input type="password" id="hostKeyInput" placeholder="Shared secret configured on the server">
+      <input type="text" id="hostKeyInput" placeholder="Shared secret configured on the server" autocomplete="off" spellcheck="false">
       <div class="hint" id="hostKeyHint">Required to create rounds and trigger the synchronized start. Set once — remembered on this device.</div>
 
       <div class="btn-row">
@@ -374,9 +374,8 @@
           <div id="grid2"></div>
           <div class="overlay" id="startOverlay">
             <h3>Ready?</h3>
-            <p id="startOverlayHint">Enter your assigned participant code and unit, then wait for your host to start the round. Everyone begins at the same synchronized moment.</p>
-            <input type="text" id="playerCode" placeholder="Your code (e.g. WSC-07)" style="max-width:220px;text-transform:uppercase;">
-            <input type="text" id="playerUnit" placeholder="Unit / Center name" style="max-width:220px;">
+            <p id="startOverlayHint">Enter your assigned participant code, then wait for your host to start the round. Everyone begins at the same synchronized moment.</p>
+            <input type="text" id="playerCode" placeholder="Your code (e.g. C)" style="max-width:220px;text-transform:uppercase;">
             <button id="startBtn" class="gold" style="margin-top:12px;">Submit Code</button>
             <div id="waitingRow" style="display:none;margin-top:14px;">
               <div class="badge">Waiting for host</div>
@@ -718,7 +717,7 @@
         }
         statusEl.textContent = 'Updates automatically as participants finish.';
         listEl.innerHTML = rows.map(r =>
-          `<li><strong>${(r.unit||'Unknown').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</strong> — ${r.wordsFound}/${r.totalWords} words · ${fmtTime(r.timeSeconds)}</li>`
+          `<li><strong>${(r.code||'?').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</strong> — ${r.wordsFound}/${r.totalWords} words · ${fmtTime(r.timeSeconds)}</li>`
         ).join('');
       }catch(e){
         statusEl.textContent = 'Leaderboard unavailable right now.';
@@ -747,7 +746,7 @@
     document.getElementById('playerBadge').textContent = (tierLabel ? tierLabel + ' Level · ' : '') + puzzle.level.label + ' · Grid ' + size + '×' + size;
 
     let locked = true;
-    let playerCode = '', playerUnit = '';
+    let playerCode = '';
     document.getElementById('boardFrame').classList.add('blurred');
     const controller = mountPuzzle('grid2','wordlist2','foundCount2','timer2','winBanner2', puzzle, {
       autoStart:false,
@@ -787,7 +786,7 @@
         ? `Completed all ${state.total} words`
         : `Found ${state.found} of ${state.total} words (time called)`;
       summary.innerHTML =
-        `<strong>${playerCode}</strong> — ${playerUnit || 'no unit entered'}<br>`+
+        `<strong>Code: ${playerCode}</strong><br>`+
         `${tierLabel ? tierLabel+' Level · ' : ''}${puzzle.level.label}<br>`+
         `${statusLine}<br>`+
         `Time: ${fmtTime(state.seconds)}<br>`+
@@ -796,7 +795,6 @@
 
       const msgText = `Word Search Result\n`+
         `Code: ${playerCode}\n`+
-        `Unit: ${playerUnit}\n`+
         `Tier: ${tierLabel || '-'}\n`+
         `Category: ${puzzle.level.label}\n`+
         `Words found: ${state.found}/${state.total}\n`+
@@ -856,28 +854,19 @@
 
     document.getElementById('startBtn').addEventListener('click', async ()=>{
       const codeInput = document.getElementById('playerCode');
-      const unitInput = document.getElementById('playerUnit');
       const code = codeInput.value.trim().toUpperCase();
-      const unit = unitInput.value.trim();
       if(!code){
         codeInput.style.borderColor = 'var(--maroon)';
         codeInput.focus();
-        return;
-      }
-      if(!unit){
-        unitInput.style.borderColor = 'var(--maroon)';
-        unitInput.focus();
         return;
       }
       const btn = document.getElementById('startBtn');
       btn.disabled = true;
       btn.textContent = 'Checking code…';
       try{
-        await apiCall('/rounds/' + encodeURIComponent(seed) + '/claim', { code, unit });
+        await apiCall('/rounds/' + encodeURIComponent(seed) + '/claim', { code });
         playerCode = code;
-        playerUnit = unit;
         codeInput.disabled = true;
-        unitInput.disabled = true;
         btn.style.display = 'none';
         document.getElementById('waitingRow').style.display = 'block';
         pollForStart();

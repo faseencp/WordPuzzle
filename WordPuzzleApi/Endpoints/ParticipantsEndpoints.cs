@@ -13,8 +13,8 @@ public static class ParticipantsEndpoints
 
     private static async Task<IResult> Claim(string seed, ClaimRequest req, Db db)
     {
-        if (string.IsNullOrWhiteSpace(req.Code) || string.IsNullOrWhiteSpace(req.Unit))
-            return Results.BadRequest("code and unit are required.");
+        if (string.IsNullOrWhiteSpace(req.Code))
+            return Results.BadRequest("code is required.");
 
         using var conn = db.Open();
 
@@ -29,9 +29,9 @@ public static class ParticipantsEndpoints
         // read) so two simultaneous claims of the same code can't both succeed.
         var rowsUpdated = await conn.ExecuteAsync(
             @"UPDATE dbo.ParticipantCodes
-              SET IsClaimed = 1, ClaimedUnit = @Unit, ClaimedName = @Name, ClaimedAtUtc = SYSUTCDATETIME()
+              SET IsClaimed = 1, ClaimedAtUtc = SYSUTCDATETIME()
               WHERE Id = @Id AND IsClaimed = 0",
-            new { req.Unit, req.Name, pc.Id });
+            new { pc.Id });
 
         if (rowsUpdated == 0)
             return Results.Conflict("This code has already been claimed.");

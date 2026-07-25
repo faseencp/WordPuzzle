@@ -4,7 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Deliberately NOT setting InvariantGlobalization=true: Microsoft.Data.SqlClient
+         requires full ICU globalization support to open a connection and throws
+         "Globalization Invariant Mode is not supported" otherwise. -->
   </PropertyGroup>
 
   <ItemGroup>

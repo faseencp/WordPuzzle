@@ -7,20 +7,16 @@ builder.Services.AddSingleton<Db>();
 
 var app = builder.Build();
 
-// TEMPORARY diagnostic middleware — surfaces the real exception in the HTTP
-// response instead of a bare 500, since IIS stdout logging under the
-// in-process hosting model wasn't producing log files during deployment.
-// Remove this once the 500 on POST /rounds is diagnosed and fixed.
+// Logs unhandled exceptions to the (now-confirmed-working) stdout log without
+// leaking exception details to callers — the earlier diagnostic version that
+// echoed the exception in the HTTP response was for finding the
+// InvariantGlobalization/SqlClient bug during deployment and has served its purpose.
 app.Use(async (context, next) =>
 {
     try { await next(); }
     catch (Exception ex)
     {
-        // Console.WriteLine first and unconditionally — this must land in the
-        // stdout log regardless of whether the HTTP response write below
-        // succeeds, so we can tell the two failure modes apart.
         Console.WriteLine("=== UNHANDLED EXCEPTION in " + context.Request.Path + " ===");
-        Console.WriteLine("HasStarted: " + context.Response.HasStarted);
         Console.WriteLine(ex.ToString());
         Console.Out.Flush();
 
@@ -28,7 +24,7 @@ app.Use(async (context, next) =>
         {
             context.Response.StatusCode = 500;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(new { error = ex.ToString() });
+            await context.Response.WriteAsJsonAsync(new { error = "Internal server error" });
         }
     }
 });

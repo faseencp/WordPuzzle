@@ -16,9 +16,20 @@ app.Use(async (context, next) =>
     try { await next(); }
     catch (Exception ex)
     {
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new { error = ex.ToString() });
+        // Console.WriteLine first and unconditionally — this must land in the
+        // stdout log regardless of whether the HTTP response write below
+        // succeeds, so we can tell the two failure modes apart.
+        Console.WriteLine("=== UNHANDLED EXCEPTION in " + context.Request.Path + " ===");
+        Console.WriteLine("HasStarted: " + context.Response.HasStarted);
+        Console.WriteLine(ex.ToString());
+        Console.Out.Flush();
+
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new { error = ex.ToString() });
+        }
     }
 });
 

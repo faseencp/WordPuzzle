@@ -122,3 +122,44 @@ backup job, and extend (or duplicate) the rclone sync step to also push
 `C:\Backups\WordPuzzle\` to the same Google Drive destination. Add basic
 retention cleanup for old `.bak` files. Run it once manually and confirm the
 file lands both locally and in Drive before considering this done.
+
+## 9. Redeploying after future code changes
+
+Reusing the same extraction folder (`$env:TEMP\wordpuzzle-extract\...`) across
+multiple updates leaves stale `obj\`/`bin\` build artifacts behind —
+`Expand-Archive -Force` only overwrites files present in the new zip (source
+`.cs` files), never the old compiled intermediate output sitting alongside
+them. MSBuild's incremental build can then decide nothing changed and silently
+reuse the **old compiled DLL** even though the source is current — this
+actually happened during initial deployment (a fix looked deployed, build
+"succeeded" in ~1.5s, but the live API kept returning old behavior for several
+redeploy attempts until `obj`/`bin` were deleted, at which point the rebuild
+took ~20s and the fix finally took effect). A build finishing suspiciously
+fast (a couple seconds) after a real code change is the tell.
+
+Always clean those folders before publishing an update:
+
+```powershell
+Remove-Item -Recurse -Force "$env:TEMP\wordpuzzle-extract\WordPuzzle-main\WordPuzzleApi\obj" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "$env:TEMP\wordpuzzle-extract\WordPuzzle-main\WordPuzzleApi\bin" -ErrorAction SilentlyContinue
+
+Stop-WebAppPool -Name "wordpuzzle-api-pool"
+Start-Sleep -Seconds 5
+
+Invoke-WebRequest -Uri "https://github.com/faseencp/WordPuzzle/archive/refs/heads/main.zip" -OutFile "$env:TEMP\wordpuzzle.zip"
+Expand-Archive -Path "$env:TEMP\wordpuzzle.zip" -DestinationPath "$env:TEMP\wordpuzzle-extract" -Force
+
+cd "$env:TEMP\wordpuzzle-extract\WordPuzzle-main\WordPuzzleApi"
+dotnet publish -c Release -o C:\inetpub\apps\wordpuzzle-api\publish
+
+Start-WebAppPool -Name "wordpuzzle-api-pool"
+```
+
+`Stop-WebAppPool` (not just `Restart`) before publishing also avoids the
+separate "file locked by IIS Worker Process" failure seen earlier, since a
+`Restart` doesn't always release the file handle before the next command runs.
+
+Verify any code change actually took effect by testing the live endpoint
+directly (e.g. `Invoke-RestMethod https://portal.rsconline.org/wordpuzzle/api/health`
+or the specific behavior that changed) rather than assuming a clean "Build
+succeeded" message means the update is live.

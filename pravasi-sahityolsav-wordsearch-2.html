@@ -558,7 +558,13 @@
     // Fixed pixel sizing (avoids relying on 1fr/aspect-ratio, which some
     // in-app browsers such as WhatsApp/Gmail webviews miscalculate).
     const viewportWidth = (window.innerWidth || document.documentElement.clientWidth || 360);
-    const availableWidth = Math.min(Math.max(viewportWidth - 56, 220), 460);
+    // Above the 680px mobile breakpoint (see .side-panel media query), the
+    // side panel (Words to Find / Leaderboard) sits beside the grid rather
+    // than stacking below it -- reserve its width + gap here so the grid
+    // doesn't claim so much space that flexbox is forced to wrap the side
+    // panel onto its own row underneath instead.
+    const sidebarReserve = viewportWidth > 680 ? 276 : 0;
+    const availableWidth = Math.min(Math.max(viewportWidth - 56 - sidebarReserve, 220), 460);
     const gapPx = 2;
     let cellPx = Math.floor((availableWidth - gapPx*(size-1)) / size);
     cellPx = Math.max(16, Math.min(cellPx, 38));

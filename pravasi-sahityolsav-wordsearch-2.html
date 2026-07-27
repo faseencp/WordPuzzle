@@ -8,13 +8,14 @@
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
   :root{
-    --paper:#F6F1E4;
-    --paper2:#ECE1C6;
-    --ink:#2B2419;
-    --gold:#B8860B;
-    --gold-light:#D9A93C;
-    --maroon:#7A2E2E;
-    --maroon-deep:#5C2020;
+    /* Theme matches the Risala Study Circle logo: deep navy-indigo + sky-blue accent. */
+    --paper:#F3F4F9;
+    --paper2:#E4E7F3;
+    --ink:#1A1642;
+    --gold:#5FBCEA;
+    --gold-light:#8FD4F2;
+    --maroon:#241D57;
+    --maroon-deep:#150F38;
   }
   *{box-sizing:border-box;}
   body{
@@ -54,7 +55,7 @@
 
   .card{
     background:var(--paper2);
-    border:1px solid rgba(43,36,25,0.14);
+    border:1px solid rgba(26,22,66,0.14);
     border-radius:6px;
     padding:18px 20px;
     margin-bottom:18px;
@@ -81,7 +82,7 @@
     font-family:'Inter',sans-serif;
     font-size:14px;
     padding:9px 10px;
-    border:1px solid rgba(43,36,25,0.25);
+    border:1px solid rgba(26,22,66,0.25);
     border-radius:4px;
     background:var(--paper);
     color:var(--ink);
@@ -111,7 +112,7 @@
     color:var(--maroon);
     border:1px solid var(--maroon);
   }
-  button.ghost:hover{background:rgba(122,46,46,0.08);}
+  button.ghost:hover{background:rgba(36,29,87,0.08);}
   .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
 
   .link-box{
@@ -129,17 +130,22 @@
 
   .layout{
     display:flex;
-    gap:26px;
+    gap:20px;
     align-items:flex-start;
     flex-wrap:wrap;
     justify-content:center;
   }
   .board-panel{
     background:var(--paper2);
-    border:1px solid rgba(43,36,25,0.14);
+    border:1px solid rgba(26,22,66,0.14);
     border-radius:6px;
     padding:16px;
     position:relative;
+    /* Flex items default to min-width:auto, which floors this panel's width
+       at its widest unbreakable content -- the badge text line -- instead of
+       letting it shrink to the grid's actual size. min-width:0 overrides that
+       default so the badge can wrap and the panel sizes to the grid instead. */
+    min-width:0;
   }
   .board-frame{
     border:2px solid var(--maroon);
@@ -167,8 +173,8 @@
     z-index:1;
     box-sizing:border-box;
   }
-  .cell.selecting{background:rgba(184,134,11,0.35);}
-  .cell.found{background:rgba(122,46,46,0.42);color:var(--paper);}
+  .cell.selecting{background:rgba(95,188,234,0.35);}
+  .cell.found{background:rgba(36,29,87,0.42);color:var(--paper);}
 
   .status-row{
     display:flex;
@@ -183,14 +189,14 @@
   .status-row .timer{color:var(--maroon);}
 
   .side-panel{width:250px;flex-shrink:0;}
-  #wordlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px;}
-  #wordlist li{
+  #wordlist, #wordlist2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px;}
+  #wordlist li, #wordlist2 li{
     padding:5px 8px;
     border-radius:4px;
     background:var(--paper);
-    border:1px solid rgba(43,36,25,0.1);
+    border:1px solid rgba(26,22,66,0.1);
   }
-  #wordlist li.done{
+  #wordlist li.done, #wordlist2 li.done{
     background:var(--maroon);
     color:var(--paper);
     text-decoration:line-through;
@@ -213,7 +219,7 @@
   .overlay{
     position:absolute;
     inset:0;
-    background:rgba(246,241,228,0.96);
+    background:rgba(243,244,249,0.96);
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -243,6 +249,13 @@
     padding:3px 9px;
     border-radius:10px;
     margin-bottom:8px;
+    /* Without a cap, this badge's full unwrapped text (e.g. "Unit Level ·
+       Secondary · Std 9-12 · Grid 12x12 · Preview only") inflates its
+       flex-item ancestor's intrinsic width calculation to fit it on one
+       line, forcing the whole board panel far wider than the grid itself.
+       Capping max-width lets it wrap onto two lines instead. */
+    max-width:380px;
+    white-space:normal;
   }
 
   #hostView, #playerView{display:none;}
@@ -563,8 +576,9 @@
     // than stacking below it -- reserve its width + gap here so the grid
     // doesn't claim so much space that flexbox is forced to wrap the side
     // panel onto its own row underneath instead.
-    const sidebarReserve = viewportWidth > 680 ? 276 : 0;
-    const availableWidth = Math.min(Math.max(viewportWidth - 56 - sidebarReserve, 220), 460);
+    const sidebarReserve = viewportWidth > 680 ? 270 : 0;
+    const maxGridWidth = viewportWidth > 680 ? 430 : 460;
+    const availableWidth = Math.min(Math.max(viewportWidth - 56 - sidebarReserve, 220), maxGridWidth);
     const gapPx = 2;
     let cellPx = Math.floor((availableWidth - gapPx*(size-1)) / size);
     cellPx = Math.max(16, Math.min(cellPx, 38));
@@ -576,6 +590,17 @@
     gridEl.style.maxWidth = 'none';
     gridEl.style.margin = '0 auto';
     gridEl.innerHTML = '';
+
+    // Explicitly cap the board panel's width to the grid's actual size
+    // (+ fixed frame/panel padding/border overhead) rather than relying on
+    // the browser's flex intrinsic-sizing to figure it out -- the badge
+    // above the grid can contain a long line of text, and flexbox's
+    // shrink-to-fit calculation uses that text's *unwrapped* max-content
+    // width when sizing this panel, ignoring the badge's own max-width and
+    // forcing the whole panel (and therefore the side panel next to it)
+    // far wider than the puzzle itself.
+    const boardPanelEl = gridEl.closest('.board-panel');
+    if(boardPanelEl) boardPanelEl.style.maxWidth = (totalPx + 58) + 'px';
     const fontPx = Math.max(10, Math.floor(cellPx*0.5));
     for(let r=0;r<size;r++){
       const row = [];

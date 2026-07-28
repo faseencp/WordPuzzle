@@ -390,6 +390,11 @@
 <script>
 (function(){
 
+/* ===================== API BASE ===================== */
+// Backed by the same WordPuzzleApi deployed for the word search competition
+// (its IIS Application path) -- see WordPuzzleApi/Endpoints/KvEndpoints.cs.
+const API_BASE = '/wordpuzzle/api';
+
 /* ===================== DEFAULT DATA ===================== */
 const DEFAULT_ROUNDS = [
   {
@@ -516,14 +521,26 @@ let playerName = '';
 let mapSettings = { provider:'osm', apiKey:'' };
 
 /* ===================== STORAGE HELPERS ===================== */
+// Same external contract as the original window.storage-backed versions
+// (get returns the parsed value or null, set stringifies before sending) --
+// everything else in this file (loadRounds, saveLeaderboard, etc.) calls
+// these two functions only and needed no changes.
 async function storageGet(key, shared){
   try{
-    const r = await window.storage.get(key, shared);
-    return r ? JSON.parse(r.value) : null;
+    const res = await fetch(API_BASE + '/kv/' + encodeURIComponent(key));
+    if(!res.ok) return null; // includes 404 "not found yet"
+    const r = await res.json();
+    return r && r.value ? JSON.parse(r.value) : null;
   }catch(e){ return null; }
 }
 async function storageSet(key, value, shared){
-  try{ await window.storage.set(key, JSON.stringify(value), shared); }catch(e){ console.error('storage set failed', e); }
+  try{
+    await fetch(API_BASE + '/kv/' + encodeURIComponent(key), {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ value: JSON.stringify(value) })
+    });
+  }catch(e){ console.error('storage set failed', e); }
 }
 
 async function loadRounds(){

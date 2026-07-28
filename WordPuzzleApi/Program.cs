@@ -32,6 +32,7 @@ app.Use(async (context, next) =>
 app.MapRoundsEndpoints();
 app.MapParticipantsEndpoints();
 app.MapResultsEndpoints();
+app.MapKvEndpoints();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 

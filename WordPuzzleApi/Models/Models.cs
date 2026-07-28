@@ -63,3 +63,7 @@ public record SubmitResultRequest(string Code, int WordsFound, int TotalWords, i
 public record SubmitResultResponse(bool Accepted, int Rank);
 
 public record LeaderboardRow(int Rank, string Code, int WordsFound, int TotalWords, int TimeSeconds);
+
+public record KvGetResponse(string Value);
+
+public record KvSetRequest(string Value);

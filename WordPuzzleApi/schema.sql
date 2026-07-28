@@ -17,6 +17,7 @@ GO
 IF OBJECT_ID('dbo.Results', 'U') IS NOT NULL DROP TABLE dbo.Results;
 IF OBJECT_ID('dbo.ParticipantCodes', 'U') IS NOT NULL DROP TABLE dbo.ParticipantCodes;
 IF OBJECT_ID('dbo.Rounds', 'U') IS NOT NULL DROP TABLE dbo.Rounds;
+IF OBJECT_ID('dbo.KeyValueStore', 'U') IS NOT NULL DROP TABLE dbo.KeyValueStore;
 GO
 
 CREATE TABLE dbo.Rounds (
@@ -56,4 +57,15 @@ CREATE TABLE dbo.Results (
 GO
 
 CREATE INDEX IX_Results_Seed ON dbo.Results(Seed);
+GO
+
+-- Generic key/value store backing the Earth Map Challenge's admin-managed
+-- rounds, leaderboard, and settings (it originally used a fictional
+-- window.storage API with the same get(key)/set(key, value) shape, so the
+-- frontend only needed its storage functions swapped to call this instead).
+CREATE TABLE dbo.KeyValueStore (
+    [Key]        nvarchar(100)  NOT NULL PRIMARY KEY,
+    Value        nvarchar(MAX)  NOT NULL,
+    UpdatedAtUtc datetime2      NOT NULL DEFAULT SYSUTCDATETIME()
+);
 GO

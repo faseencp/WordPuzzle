@@ -23,11 +23,19 @@ public static class EarthMapEndpoints
         app.MapPost("/earthmap/batches/{batchKey}/results", SubmitResult);
         app.MapGet("/earthmap/batches/{batchKey}/leaderboard", GetLeaderboard);
         app.MapPost("/earthmap/batches/{batchKey}/clear-results", ClearResults);
+        app.MapPost("/admin/login", AdminLogin);
+    }
+
+    private static IResult AdminLogin(AdminLoginRequest req, IConfiguration config)
+    {
+        return EarthMapAuth.IsValid(config, req.Username, req.Password)
+            ? Results.Ok(new AdminLoginResponse(true))
+            : Results.Unauthorized();
     }
 
     private static async Task<IResult> CreateBatch(CreateBatchRequest req, Db db, IConfiguration config)
     {
-        if (!HostAuth.IsValid(config, req.HostKey))
+        if (!EarthMapAuth.IsValid(config, req.Username, req.Password))
             return Results.Unauthorized();
 
         if (req.ParticipantCount <= 0)
@@ -149,7 +157,7 @@ public static class EarthMapEndpoints
     // claimed a code in an in-progress competition.
     private static async Task<IResult> ClearResults(string batchKey, ClearResultsRequest req, Db db, IConfiguration config)
     {
-        if (!HostAuth.IsValid(config, req.HostKey))
+        if (!EarthMapAuth.IsValid(config, req.Username, req.Password))
             return Results.Unauthorized();
 
         using var conn = db.Open();

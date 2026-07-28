@@ -235,6 +235,20 @@
     </nav>
   </header>
 
+  <!-- ============ ADMIN LOGIN VIEW (only ever shown at /earthmap/admin) ============ -->
+  <div class="view" id="view-admin-login">
+    <div class="card" style="max-width:360px;margin:40px auto;">
+      <h2 class="section-title">Admin Login</h2>
+      <p class="muted">Sign in to manage rounds, participant codes, and the leaderboard.</p>
+      <label class="field-label" style="margin-top:0;">Username</label>
+      <input type="text" id="admin-login-username" autocomplete="username" />
+      <label class="field-label">Password</label>
+      <input type="password" id="admin-login-password" autocomplete="current-password" />
+      <div style="margin-top:16px;"><button class="btn" id="btn-admin-login">Log In</button></div>
+      <p class="muted" id="admin-login-status" style="margin-top:12px;"></p>
+    </div>
+  </div>
+
   <!-- ============ PLAY VIEW ============ -->
   <div class="view active" id="view-play">
 
@@ -316,8 +330,14 @@
         <p class="muted">Build a new round, then add locations by clicking the map to set exact coordinates.</p>
         <label class="field-label">Round title</label>
         <input type="text" id="new-round-title" placeholder="e.g. Silk Road Cities" />
-        <label class="field-label">Category label</label>
-        <input type="text" id="new-round-category" placeholder="e.g. History & Trade" />
+        <label class="field-label">Category</label>
+        <select id="new-round-category">
+          <option value="Islamic History">Islamic History</option>
+          <option value="World Geography">World Geography</option>
+          <option value="Culture & Heritage">Culture & Heritage</option>
+          <option value="Physical Geography">Physical Geography</option>
+          <option value="Military History">Military History</option>
+        </select>
         <div style="margin-top:16px;"><button class="btn small" id="btn-create-round">+ Create Round</button></div>
 
         <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
@@ -354,9 +374,7 @@
         <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
           <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Participant codes</h3>
           <p class="muted">Generates a fresh batch of codes (A, B, C, …) and resets the live leaderboard for that batch — same format as the word search competition. Hand codes out before play starts.</p>
-          <label class="field-label" style="margin-top:0;">Host key</label>
-          <input type="text" id="em-host-key" placeholder="Shared secret configured on the server" autocomplete="off" spellcheck="false" />
-          <label class="field-label">Expected number of participants</label>
+          <label class="field-label" style="margin-top:0;">Expected number of participants</label>
           <input type="text" inputmode="numeric" id="em-participant-count" placeholder="e.g. 30" />
           <div style="margin-top:12px;"><button class="btn small teal" id="btn-generate-em-codes">Generate Codes</button></div>
           <p class="muted" id="em-codes-status" style="margin-top:10px;"></p>
@@ -984,6 +1002,58 @@ function switchView(view){
   if(view==='admin') renderAdmin();
 }
 
+/* ===================== ADMIN ROUTE + LOGIN =====================
+   /earthmap/ (participant link) never shows or links to admin at all --
+   the Admin nav button is removed from the DOM on that route. /earthmap/admin
+   is a separate URL (same file, deployed to a second physical location -- see
+   DEPLOY.md) that shows nothing but a login screen until the username/password
+   are verified against the server, then goes straight to the admin panel with
+   no Play/Leaderboard tabs at all. */
+const isAdminRoute = /\/admin\/?$/.test(window.location.pathname);
+
+function showAdminPanel(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-admin').classList.add('active');
+  renderAdmin();
+}
+function showAdminLogin(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-admin-login').classList.add('active');
+}
+function setupRouting(){
+  if(isAdminRoute){
+    document.querySelector('nav.tabs').style.display = 'none';
+    if(getAdminSession()) showAdminPanel();
+    else showAdminLogin();
+  }else{
+    const adminBtn = document.querySelector('nav.tabs button[data-view="admin"]');
+    if(adminBtn) adminBtn.remove();
+    switchView('play');
+  }
+}
+
+document.getElementById('btn-admin-login').addEventListener('click', async ()=>{
+  const username = document.getElementById('admin-login-username').value.trim();
+  const password = document.getElementById('admin-login-password').value;
+  const status = document.getElementById('admin-login-status');
+  const btn = document.getElementById('btn-admin-login');
+  if(!username || !password){ status.style.color = 'var(--coral)'; status.textContent = 'Enter both username and password.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  try{
+    await apiCall('/admin/login', { username, password });
+    sessionStorage.setItem('earthmap_admin_session', JSON.stringify({ username, password }));
+    status.textContent = '';
+    showAdminPanel();
+  }catch(e){
+    status.style.color = 'var(--coral)';
+    status.textContent = e.status === 401 ? 'Incorrect username or password.' : 'Could not reach the login server.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Log In';
+  }
+});
+
 /* ===================== PLAY: START SCREEN ===================== */
 function updateStartBtn(){
   const codeOk = document.getElementById('player-code').value.trim().length>0;
@@ -1220,14 +1290,17 @@ function drawLeaderboard(list, batchKey){
 }
 
 /* ===================== ADMIN ===================== */
+function getAdminSession(){
+  try{ return JSON.parse(sessionStorage.getItem('earthmap_admin_session') || 'null'); }
+  catch(e){ return null; }
+}
+
 function renderAdmin(){
   const targetSel = document.getElementById('target-round');
   targetSel.innerHTML = rounds.map(r=>`<option value="${r.id}">${escapeHtml(r.title)}</option>`).join('');
   document.getElementById('locations-per-challenge').value = locationsPerChallenge;
   document.getElementById('map-provider').value = mapSettings.provider || 'osm';
   document.getElementById('map-api-key').value = mapSettings.apiKey || '';
-  const hostKeyInput = document.getElementById('em-host-key');
-  if(!hostKeyInput.value) hostKeyInput.value = localStorage.getItem('earthmap_host_key') || '';
   initAdminMapIfNeeded();
   renderRoundsManager();
 }
@@ -1253,20 +1326,18 @@ function printEmCodes(batchKey, codes){
 }
 
 document.getElementById('btn-generate-em-codes').addEventListener('click', async ()=>{
-  const hostKeyInput = document.getElementById('em-host-key');
-  const hostKey = hostKeyInput.value.trim();
+  const session = getAdminSession();
   const participantCount = parseInt(document.getElementById('em-participant-count').value, 10);
   const status = document.getElementById('em-codes-status');
   const btn = document.getElementById('btn-generate-em-codes');
 
-  if(!hostKey){ status.textContent = 'Enter the host key first.'; status.style.color = 'var(--coral)'; return; }
+  if(!session){ status.textContent = 'Your session expired — please log in again.'; status.style.color = 'var(--coral)'; return; }
   if(!participantCount || participantCount < 1){ status.textContent = 'Enter a valid expected participant count.'; status.style.color = 'var(--coral)'; return; }
 
-  localStorage.setItem('earthmap_host_key', hostKey);
   btn.disabled = true;
   btn.textContent = 'Generating…';
   try{
-    const res = await apiCall('/earthmap/batches', { participantCount, hostKey });
+    const res = await apiCall('/earthmap/batches', { participantCount, username: session.username, password: session.password });
     status.style.color = '';
     status.textContent = `${res.codes.length} codes generated for batch ${res.batchKey}. The leaderboard has reset for this fresh batch.`;
     document.getElementById('em-codes-list').style.display = 'block';
@@ -1275,7 +1346,7 @@ document.getElementById('btn-generate-em-codes').addEventListener('click', async
     if(document.getElementById('view-leaderboard').classList.contains('active')) renderLeaderboard();
   }catch(e){
     status.style.color = 'var(--coral)';
-    status.textContent = e.status === 401 ? 'Host key was rejected by the server.' : 'Could not reach the round server.';
+    status.textContent = e.status === 401 ? 'Your session was rejected by the server — please log in again.' : 'Could not reach the round server.';
   }finally{
     btn.disabled = false;
     btn.textContent = 'Generate Codes';
@@ -1400,16 +1471,16 @@ document.getElementById('btn-reset-defaults').addEventListener('click', async ()
 
 document.getElementById('btn-clear-lb').addEventListener('click', async ()=>{
   if(!confirm('Clear the current batch\'s leaderboard? This cannot be undone.')) return;
-  const hostKey = document.getElementById('em-host-key').value.trim() || localStorage.getItem('earthmap_host_key') || '';
-  if(!hostKey){ showToast('Enter the host key above first'); return; }
+  const session = getAdminSession();
+  if(!session){ showToast('Your session expired — please log in again'); return; }
   try{
     const current = await apiCall('/earthmap/current-batch');
     if(!current.batchKey){ showToast('No competition has been set up yet'); return; }
-    await apiCall('/earthmap/batches/' + encodeURIComponent(current.batchKey) + '/clear-results', { hostKey });
+    await apiCall('/earthmap/batches/' + encodeURIComponent(current.batchKey) + '/clear-results', { username: session.username, password: session.password });
     showToast('Leaderboard cleared');
     if(document.getElementById('view-leaderboard').classList.contains('active')) renderLeaderboard();
   }catch(e){
-    showToast(e.status === 401 ? 'Host key was rejected by the server' : 'Could not reach the round server');
+    showToast(e.status === 401 ? 'Your session was rejected by the server — please log in again' : 'Could not reach the round server');
   }
 });
 
@@ -1418,6 +1489,7 @@ document.getElementById('btn-clear-lb').addEventListener('click', async ()=>{
   await loadRounds();
   await loadSettings();
   updateStartBtn();
+  setupRouting();
 })();
 
 })();

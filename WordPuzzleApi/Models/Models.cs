@@ -86,7 +86,7 @@ public class EarthMapCode
     public DateTime? ClaimedAtUtc { get; set; }
 }
 
-public record CreateBatchRequest(int ParticipantCount, string HostKey);
+public record CreateBatchRequest(int ParticipantCount, string Username, string Password);
 
 public record CreateBatchResponse(string BatchKey, string[] Codes);
 
@@ -102,4 +102,8 @@ public record SubmitEarthMapResultResponse(bool Accepted, int Rank);
 
 public record EarthMapLeaderboardRow(int Rank, string Code, int Score, int LocationCount, DateTime SubmittedAtUtc);
 
-public record ClearResultsRequest(string HostKey);
+public record ClearResultsRequest(string Username, string Password);
+
+public record AdminLoginRequest(string Username, string Password);
+
+public record AdminLoginResponse(bool Success);

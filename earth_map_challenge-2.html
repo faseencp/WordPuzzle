@@ -240,12 +240,13 @@
 
     <div id="stage-start" class="card">
       <h2 class="section-title">Chart your course</h2>
-      <p class="muted">Enter your name and begin. Pinpoint each location as fast and accurately as you can — points reward both precision and speed.</p>
-      <label class="field-label">Your name</label>
-      <input type="text" id="player-name" placeholder="e.g. Amina Yusuf" maxlength="30" style="max-width:360px;" />
+      <p class="muted">Enter your assigned participant code and begin. Pinpoint each location as fast and accurately as you can — points reward both precision and speed.</p>
+      <label class="field-label">Your code</label>
+      <input type="text" id="player-code" placeholder="e.g. C" maxlength="10" style="max-width:200px;text-transform:uppercase;" />
       <div style="margin-top:22px;">
         <button class="btn" id="btn-start" disabled>Begin Challenge →</button>
       </div>
+      <p class="muted" id="start-status" style="margin-top:12px;"></p>
     </div>
 
     <div id="stage-question" class="card" style="display:none;">
@@ -300,7 +301,7 @@
         <p class="muted">Shared across every participant using this challenge.</p>
       </div>
       <table class="lb">
-        <thead><tr><th>Rank</th><th>Player</th><th>Locations</th><th>Score</th><th>Date</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Code</th><th>Locations</th><th>Score</th><th>Submitted</th></tr></thead>
         <tbody id="lb-body"></tbody>
       </table>
       <p class="muted" id="lb-empty" style="display:none;margin-top:16px;">No scores yet — be the first to play.</p>
@@ -351,6 +352,21 @@
         <div id="rounds-manager"></div>
 
         <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
+          <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Participant codes</h3>
+          <p class="muted">Generates a fresh batch of codes (A, B, C, …) and resets the live leaderboard for that batch — same format as the word search competition. Hand codes out before play starts.</p>
+          <label class="field-label" style="margin-top:0;">Host key</label>
+          <input type="text" id="em-host-key" placeholder="Shared secret configured on the server" autocomplete="off" spellcheck="false" />
+          <label class="field-label">Expected number of participants</label>
+          <input type="text" inputmode="numeric" id="em-participant-count" placeholder="e.g. 30" />
+          <div style="margin-top:12px;"><button class="btn small teal" id="btn-generate-em-codes">Generate Codes</button></div>
+          <p class="muted" id="em-codes-status" style="margin-top:10px;"></p>
+          <div id="em-codes-list" style="display:none;margin-top:6px;">
+            <ul style="list-style:none;margin:0 0 10px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;font-family:'IBM Plex Mono',monospace;font-size:13px;" id="em-codes-ul"></ul>
+            <button class="btn small secondary" id="btn-print-em-codes">Print Codes</button>
+          </div>
+        </div>
+
+        <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
           <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Challenge settings</h3>
           <label class="field-label" style="margin-top:0;">Locations per challenge</label>
           <input type="number" id="locations-per-challenge" min="1" max="50" style="max-width:160px;" />
@@ -392,8 +408,26 @@
 
 /* ===================== API BASE ===================== */
 // Backed by the same WordPuzzleApi deployed for the word search competition
-// (its IIS Application path) -- see WordPuzzleApi/Endpoints/KvEndpoints.cs.
+// (its IIS Application path) -- see WordPuzzleApi/Endpoints/KvEndpoints.cs
+// and Endpoints/EarthMapEndpoints.cs.
 const API_BASE = '/wordpuzzle/api';
+
+async function apiCall(path, body){
+  const res = await fetch(API_BASE + path, {
+    method: body ? 'POST' : 'GET',
+    headers: body ? {'Content-Type':'application/json'} : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data = null;
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){
+    const err = new Error((data && data.title) || res.statusText || ('HTTP ' + res.status));
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
 
 /* ===================== DEFAULT DATA ===================== */
 const DEFAULT_ROUNDS = [
@@ -517,7 +551,8 @@ let timerInterval = null;
 let timeLeft = 30;
 const TIME_LIMIT = 30;
 let questionStartTs = 0;
-let playerName = '';
+let playerCode = '';
+let currentBatchKey = null;
 let mapSettings = { provider:'osm', apiKey:'' };
 
 /* ===================== STORAGE HELPERS ===================== */
@@ -564,16 +599,6 @@ async function saveSettings(){
 }
 async function saveMapSettings(){
   await storageSet('map-settings', mapSettings, true);
-}
-
-async function loadLeaderboard(){
-  let data = await storageGet('leaderboard-data', true);
-  if(!data || !Array.isArray(data)) data = [];
-  return data;
-}
-async function saveLeaderboard(list){
-  if(list.length>200) list = list.slice(0,200);
-  await storageSet('leaderboard-data', list, true);
 }
 
 /* ===================== UTIL ===================== */
@@ -955,27 +980,57 @@ function switchView(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   if(view==='leaderboard') renderLeaderboard();
+  else stopLeaderboardPolling();
   if(view==='admin') renderAdmin();
 }
 
 /* ===================== PLAY: START SCREEN ===================== */
 function updateStartBtn(){
-  const nameOk = document.getElementById('player-name').value.trim().length>0;
+  const codeOk = document.getElementById('player-code').value.trim().length>0;
   const hasQuestions = rounds.some(r=>r.questions.length>0);
-  document.getElementById('btn-start').disabled = !(nameOk && hasQuestions);
+  document.getElementById('btn-start').disabled = !(codeOk && hasQuestions);
 }
-document.getElementById('player-name').addEventListener('input', updateStartBtn);
+document.getElementById('player-code').addEventListener('input', updateStartBtn);
 
-document.getElementById('btn-start').addEventListener('click', ()=>{
-  playerName = document.getElementById('player-name').value.trim().slice(0,30);
-  const pool = rounds.flatMap(r=>r.questions);
-  currentQuestions = shuffle(pool).slice(0, Math.min(locationsPerChallenge, pool.length));
-  qIndex=0; runningScore=0; perQuestionResults=[];
-  document.getElementById('stage-start').style.display='none';
-  document.getElementById('stage-summary').style.display='none';
-  document.getElementById('stage-question').style.display='block';
-  initMapIfNeeded();
-  loadQuestion();
+document.getElementById('btn-start').addEventListener('click', async ()=>{
+  const codeInput = document.getElementById('player-code');
+  const code = codeInput.value.trim().toUpperCase();
+  const status = document.getElementById('start-status');
+  const btn = document.getElementById('btn-start');
+  if(!code) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Checking code…';
+  status.textContent = '';
+  status.style.color = '';
+  try{
+    const current = await apiCall('/earthmap/current-batch');
+    if(!current.batchKey){
+      status.style.color = 'var(--coral)';
+      status.textContent = 'No competition has been set up yet — ask your host to generate codes first.';
+      return;
+    }
+    await apiCall('/earthmap/batches/' + encodeURIComponent(current.batchKey) + '/claim', { code });
+    playerCode = code;
+    currentBatchKey = current.batchKey;
+
+    const pool = rounds.flatMap(r=>r.questions);
+    currentQuestions = shuffle(pool).slice(0, Math.min(locationsPerChallenge, pool.length));
+    qIndex=0; runningScore=0; perQuestionResults=[];
+    document.getElementById('stage-start').style.display='none';
+    document.getElementById('stage-summary').style.display='none';
+    document.getElementById('stage-question').style.display='block';
+    initMapIfNeeded();
+    loadQuestion();
+  }catch(e){
+    status.style.color = 'var(--coral)';
+    if(e.status === 409) status.textContent = 'That code has already been claimed by someone else — check with your host.';
+    else if(e.status === 404) status.textContent = 'Unrecognized code — double-check it and try again.';
+    else status.textContent = 'Could not reach the competition server — check your connection and try again.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Begin Challenge →';
+  }
 });
 
 /* ===================== MAP INIT ===================== */
@@ -1078,7 +1133,7 @@ function showSummary(){
   document.getElementById('stage-question').style.display='none';
   document.getElementById('stage-summary').style.display='block';
   document.getElementById('summary-total').textContent = runningScore+' pts';
-  document.getElementById('summary-sub').textContent = `${playerName} · ${currentQuestions.length} locations`;
+  document.getElementById('summary-sub').textContent = `Code: ${playerCode} · ${currentQuestions.length} locations`;
   const list = document.getElementById('summary-list');
   list.innerHTML='';
   perQuestionResults.forEach(r=>{
@@ -1096,42 +1151,69 @@ function showSummary(){
 document.getElementById('btn-save-score').addEventListener('click', async ()=>{
   const btn = document.getElementById('btn-save-score');
   btn.disabled=true; btn.textContent='Saving…';
-  const list = await loadLeaderboard();
-  list.push({
-    name:playerName, score:runningScore, count:currentQuestions.length,
-    date:new Date().toISOString()
-  });
-  list.sort((a,b)=>b.score-a.score);
-  await saveLeaderboard(list);
-  btn.textContent='Saved ✓';
-  showToast('Score saved to the leaderboard');
+  try{
+    const res = await apiCall('/earthmap/batches/' + encodeURIComponent(currentBatchKey) + '/results', {
+      code: playerCode, score: runningScore, locationCount: currentQuestions.length
+    });
+    btn.textContent = 'Saved ✓ (Rank #' + res.rank + ')';
+    showToast('Score saved to the leaderboard');
+    if(document.getElementById('view-leaderboard').classList.contains('active')) renderLeaderboard();
+  }catch(e){
+    btn.disabled = false;
+    btn.textContent = 'Save to Leaderboard';
+    showToast('Could not reach the leaderboard server — check your connection and try again.');
+  }
 });
 
 document.getElementById('btn-play-again').addEventListener('click', ()=>{
   document.getElementById('stage-summary').style.display='none';
   document.getElementById('stage-start').style.display='block';
-  document.getElementById('player-name').value='';
+  document.getElementById('player-code').value='';
+  playerCode = '';
+  currentBatchKey = null;
   updateStartBtn();
 });
 
-/* ===================== LEADERBOARD ===================== */
+/* ===================== LEADERBOARD (live, scoped to the current batch) ===================== */
+let leaderboardPollHandle = null;
+
 async function renderLeaderboard(){
-  const list = await loadLeaderboard();
-  drawLeaderboard(list);
+  await refreshLeaderboard();
+  clearInterval(leaderboardPollHandle);
+  leaderboardPollHandle = setInterval(refreshLeaderboard, 4000);
 }
-function drawLeaderboard(list){
+function stopLeaderboardPolling(){
+  clearInterval(leaderboardPollHandle);
+  leaderboardPollHandle = null;
+}
+async function refreshLeaderboard(){
+  try{
+    const current = await apiCall('/earthmap/current-batch');
+    if(!current.batchKey){ drawLeaderboard([], null); return; }
+    const list = await apiCall('/earthmap/batches/' + encodeURIComponent(current.batchKey) + '/leaderboard');
+    drawLeaderboard(list, current.batchKey);
+  }catch(e){ /* transient network hiccup -- next poll retries */ }
+}
+function drawLeaderboard(list, batchKey){
   const body = document.getElementById('lb-body');
   body.innerHTML='';
-  document.getElementById('lb-empty').style.display = list.length===0 ? 'block':'none';
+  const empty = document.getElementById('lb-empty');
+  if(!batchKey){
+    empty.style.display = 'block';
+    empty.textContent = 'No competition has been set up yet — generate participant codes in Admin first.';
+    return;
+  }
+  empty.style.display = list.length===0 ? 'block':'none';
+  empty.textContent = 'No scores yet — be the first to play.';
   list.slice(0,50).forEach((row,i)=>{
     const tr=document.createElement('tr');
     const badgeClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
     tr.innerHTML = `
-      <td><span class="rank-badge ${badgeClass}">${i+1}</span></td>
-      <td>${escapeHtml(row.name)}</td>
-      <td class="muted">${row.count||''}</td>
+      <td><span class="rank-badge ${badgeClass}">${row.rank}</span></td>
+      <td>${escapeHtml(row.code)}</td>
+      <td class="muted">${row.locationCount||''}</td>
       <td style="font-family:'IBM Plex Mono',monospace;color:var(--gold);">${row.score}</td>
-      <td class="muted">${new Date(row.date).toLocaleDateString()}</td>
+      <td class="muted">${new Date(row.submittedAtUtc).toLocaleTimeString()}</td>
     `;
     body.appendChild(tr);
   });
@@ -1144,9 +1226,61 @@ function renderAdmin(){
   document.getElementById('locations-per-challenge').value = locationsPerChallenge;
   document.getElementById('map-provider').value = mapSettings.provider || 'osm';
   document.getElementById('map-api-key').value = mapSettings.apiKey || '';
+  const hostKeyInput = document.getElementById('em-host-key');
+  if(!hostKeyInput.value) hostKeyInput.value = localStorage.getItem('earthmap_host_key') || '';
   initAdminMapIfNeeded();
   renderRoundsManager();
 }
+
+function printEmCodes(batchKey, codes){
+  const w = window.open('', '_blank');
+  if(!w) return;
+  const rows = codes.map(c => `<div class="code-cell">${escapeHtml(c)}</div>`).join('');
+  w.document.write(`<!DOCTYPE html><html><head><title>Participant Codes — ${escapeHtml(batchKey)}</title>
+    <style>
+      body{font-family:sans-serif;padding:24px;}
+      h1{font-size:18px;}
+      .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px;}
+      .code-cell{border:1px solid #999;border-radius:4px;padding:10px;text-align:center;font-family:monospace;font-size:16px;}
+    </style></head><body>
+    <h1>Global Earth Map Challenge — Participant Codes (${codes.length})</h1>
+    <p>Batch: ${escapeHtml(batchKey)}</p>
+    <div class="grid">${rows}</div>
+    </body></html>`);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+document.getElementById('btn-generate-em-codes').addEventListener('click', async ()=>{
+  const hostKeyInput = document.getElementById('em-host-key');
+  const hostKey = hostKeyInput.value.trim();
+  const participantCount = parseInt(document.getElementById('em-participant-count').value, 10);
+  const status = document.getElementById('em-codes-status');
+  const btn = document.getElementById('btn-generate-em-codes');
+
+  if(!hostKey){ status.textContent = 'Enter the host key first.'; status.style.color = 'var(--coral)'; return; }
+  if(!participantCount || participantCount < 1){ status.textContent = 'Enter a valid expected participant count.'; status.style.color = 'var(--coral)'; return; }
+
+  localStorage.setItem('earthmap_host_key', hostKey);
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try{
+    const res = await apiCall('/earthmap/batches', { participantCount, hostKey });
+    status.style.color = '';
+    status.textContent = `${res.codes.length} codes generated for batch ${res.batchKey}. The leaderboard has reset for this fresh batch.`;
+    document.getElementById('em-codes-list').style.display = 'block';
+    document.getElementById('em-codes-ul').innerHTML = res.codes.map(c => `<li>${escapeHtml(c)}</li>`).join('');
+    document.getElementById('btn-print-em-codes').onclick = () => printEmCodes(res.batchKey, res.codes);
+    if(document.getElementById('view-leaderboard').classList.contains('active')) renderLeaderboard();
+  }catch(e){
+    status.style.color = 'var(--coral)';
+    status.textContent = e.status === 401 ? 'Host key was rejected by the server.' : 'Could not reach the round server.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Generate Codes';
+  }
+});
 function initAdminMapIfNeeded(){
   if(adminMap) return;
   adminMap = new MapController(document.getElementById('admin-map'), {
@@ -1265,9 +1399,18 @@ document.getElementById('btn-reset-defaults').addEventListener('click', async ()
 });
 
 document.getElementById('btn-clear-lb').addEventListener('click', async ()=>{
-  if(!confirm('Clear the entire leaderboard? This cannot be undone.')) return;
-  await saveLeaderboard([]);
-  showToast('Leaderboard cleared');
+  if(!confirm('Clear the current batch\'s leaderboard? This cannot be undone.')) return;
+  const hostKey = document.getElementById('em-host-key').value.trim() || localStorage.getItem('earthmap_host_key') || '';
+  if(!hostKey){ showToast('Enter the host key above first'); return; }
+  try{
+    const current = await apiCall('/earthmap/current-batch');
+    if(!current.batchKey){ showToast('No competition has been set up yet'); return; }
+    await apiCall('/earthmap/batches/' + encodeURIComponent(current.batchKey) + '/clear-results', { hostKey });
+    showToast('Leaderboard cleared');
+    if(document.getElementById('view-leaderboard').classList.contains('active')) renderLeaderboard();
+  }catch(e){
+    showToast(e.status === 401 ? 'Host key was rejected by the server' : 'Could not reach the round server');
+  }
 });
 
 /* ===================== INIT ===================== */

@@ -18,6 +18,9 @@ IF OBJECT_ID('dbo.Results', 'U') IS NOT NULL DROP TABLE dbo.Results;
 IF OBJECT_ID('dbo.ParticipantCodes', 'U') IS NOT NULL DROP TABLE dbo.ParticipantCodes;
 IF OBJECT_ID('dbo.Rounds', 'U') IS NOT NULL DROP TABLE dbo.Rounds;
 IF OBJECT_ID('dbo.KeyValueStore', 'U') IS NOT NULL DROP TABLE dbo.KeyValueStore;
+IF OBJECT_ID('dbo.EarthMapResults', 'U') IS NOT NULL DROP TABLE dbo.EarthMapResults;
+IF OBJECT_ID('dbo.EarthMapCodes', 'U') IS NOT NULL DROP TABLE dbo.EarthMapCodes;
+IF OBJECT_ID('dbo.EarthMapBatches', 'U') IS NOT NULL DROP TABLE dbo.EarthMapBatches;
 GO
 
 CREATE TABLE dbo.Rounds (
@@ -68,4 +71,40 @@ CREATE TABLE dbo.KeyValueStore (
     Value        nvarchar(MAX)  NOT NULL,
     UpdatedAtUtc datetime2      NOT NULL DEFAULT SYSUTCDATETIME()
 );
+GO
+
+-- Earth Map Challenge participant codes + live leaderboard. Mirrors the word
+-- search Rounds/ParticipantCodes/Results shape, but this file has no
+-- per-instance "seed" (everyone always plays at the same URL, pulling a
+-- random subset of the admin-managed question pool) -- BatchKey plays that
+-- role instead: each "Generate Codes" click starts a new batch, and the
+-- current batch is just whichever one was created most recently.
+CREATE TABLE dbo.EarthMapBatches (
+    BatchKey         nvarchar(64)  NOT NULL PRIMARY KEY,
+    ParticipantCount int           NOT NULL,
+    CreatedAtUtc     datetime2     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+CREATE TABLE dbo.EarthMapCodes (
+    Id           int identity(1,1) NOT NULL PRIMARY KEY,
+    BatchKey     nvarchar(64)  NOT NULL REFERENCES dbo.EarthMapBatches(BatchKey),
+    Code         nvarchar(20)  NOT NULL,
+    IsClaimed    bit           NOT NULL DEFAULT 0,
+    ClaimedAtUtc datetime2     NULL,
+    CONSTRAINT UQ_EarthMapCodes_BatchKey_Code UNIQUE (BatchKey, Code)
+);
+GO
+
+CREATE TABLE dbo.EarthMapResults (
+    Id             int identity(1,1) NOT NULL PRIMARY KEY,
+    EarthMapCodeId int       NOT NULL UNIQUE REFERENCES dbo.EarthMapCodes(Id),
+    BatchKey       nvarchar(64) NOT NULL REFERENCES dbo.EarthMapBatches(BatchKey),
+    Score          int       NOT NULL,
+    LocationCount  int       NOT NULL,
+    SubmittedAtUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+CREATE INDEX IX_EarthMapResults_BatchKey ON dbo.EarthMapResults(BatchKey);
 GO

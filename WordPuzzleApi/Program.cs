@@ -33,6 +33,7 @@ app.MapRoundsEndpoints();
 app.MapParticipantsEndpoints();
 app.MapResultsEndpoints();
 app.MapKvEndpoints();
+app.MapEarthMapEndpoints();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 

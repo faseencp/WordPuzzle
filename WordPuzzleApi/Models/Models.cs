@@ -67,3 +67,39 @@ public record LeaderboardRow(int Rank, string Code, int WordsFound, int TotalWor
 public record KvGetResponse(string Value);
 
 public record KvSetRequest(string Value);
+
+// ---- Earth Map Challenge ----
+
+public class EarthMapBatch
+{
+    public string BatchKey { get; set; } = "";
+    public int ParticipantCount { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}
+
+public class EarthMapCode
+{
+    public int Id { get; set; }
+    public string BatchKey { get; set; } = "";
+    public string Code { get; set; } = "";
+    public bool IsClaimed { get; set; }
+    public DateTime? ClaimedAtUtc { get; set; }
+}
+
+public record CreateBatchRequest(int ParticipantCount, string HostKey);
+
+public record CreateBatchResponse(string BatchKey, string[] Codes);
+
+public record CurrentBatchResponse(string? BatchKey);
+
+public record EarthMapClaimRequest(string Code);
+
+public record EarthMapClaimResponse(bool Claimed, int CodeId);
+
+public record SubmitEarthMapResultRequest(string Code, int Score, int LocationCount);
+
+public record SubmitEarthMapResultResponse(bool Accepted, int Rank);
+
+public record EarthMapLeaderboardRow(int Rank, string Code, int Score, int LocationCount, DateTime SubmittedAtUtc);
+
+public record ClearResultsRequest(string HostKey);

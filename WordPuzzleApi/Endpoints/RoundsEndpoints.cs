@@ -52,7 +52,7 @@ public static class RoundsEndpoints
             });
 
         var codes = Enumerable.Range(1, req.ParticipantCount)
-            .Select(ToLetterCode)
+            .Select(CodeGenerator.ToLetterCode)
             .ToArray();
 
         foreach (var code in codes)
@@ -100,19 +100,5 @@ public static class RoundsEndpoints
             return Results.NotFound();
 
         return Results.Ok(new RoundStatusResponse(round.Status, round.StartedAtUtc, DateTime.UtcNow));
-    }
-
-    // 1 -> "A", 2 -> "B", ..., 26 -> "Z", 27 -> "AA", 28 -> "AB", ...
-    // (spreadsheet-column style, so any participant count is supported)
-    private static string ToLetterCode(int n)
-    {
-        var chars = new Stack<char>();
-        while (n > 0)
-        {
-            n--;
-            chars.Push((char)('A' + n % 26));
-            n /= 26;
-        }
-        return new string(chars.ToArray());
     }
 }

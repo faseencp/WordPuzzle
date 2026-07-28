@@ -255,6 +255,7 @@
     <div id="stage-start" class="card">
       <h2 class="section-title">Chart your course</h2>
       <p class="muted">Enter your assigned participant code and begin. Pinpoint each location as fast and accurately as you can — points reward both precision and speed.</p>
+      <p class="muted" id="active-category-note" style="display:none;"></p>
       <label class="field-label">Your code</label>
       <input type="text" id="player-code" placeholder="e.g. C" maxlength="10" style="max-width:200px;text-transform:uppercase;" />
       <div style="margin-top:22px;">
@@ -330,14 +331,7 @@
         <p class="muted">Build a new round, then add locations by clicking the map to set exact coordinates.</p>
         <label class="field-label">Round title</label>
         <input type="text" id="new-round-title" placeholder="e.g. Silk Road Cities" />
-        <label class="field-label">Category</label>
-        <select id="new-round-category">
-          <option value="Islamic History">Islamic History</option>
-          <option value="World Geography">World Geography</option>
-          <option value="Culture & Heritage">Culture & Heritage</option>
-          <option value="Physical Geography">Physical Geography</option>
-          <option value="Military History">Military History</option>
-        </select>
+        <p class="muted">Rounds are just a way to group locations for editing — every round's locations get mixed together into one pool during play, regardless of topic.</p>
         <div style="margin-top:16px;"><button class="btn small" id="btn-create-round">+ Create Round</button></div>
 
         <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
@@ -374,7 +368,12 @@
         <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px;">
           <h3 style="font-family:'Fraunces',serif;font-size:16px;margin:0 0 10px;">Participant codes</h3>
           <p class="muted">Generates a fresh batch of codes (A, B, C, …) and resets the live leaderboard for that batch — same format as the word search competition. Hand codes out before play starts.</p>
-          <label class="field-label" style="margin-top:0;">Expected number of participants</label>
+          <label class="field-label" style="margin-top:0;">Category</label>
+          <select id="em-category">
+            <option value="junior">Junior — Std 5–8</option>
+            <option value="secondary" selected>Secondary — Std 9–12</option>
+          </select>
+          <label class="field-label">Expected number of participants</label>
           <input type="text" inputmode="numeric" id="em-participant-count" placeholder="e.g. 30" />
           <div style="margin-top:12px;"><button class="btn small teal" id="btn-generate-em-codes">Generate Codes</button></div>
           <p class="muted" id="em-codes-status" style="margin-top:10px;"></p>
@@ -1327,6 +1326,7 @@ function printEmCodes(batchKey, codes){
 
 document.getElementById('btn-generate-em-codes').addEventListener('click', async ()=>{
   const session = getAdminSession();
+  const category = document.getElementById('em-category').value;
   const participantCount = parseInt(document.getElementById('em-participant-count').value, 10);
   const status = document.getElementById('em-codes-status');
   const btn = document.getElementById('btn-generate-em-codes');
@@ -1337,9 +1337,9 @@ document.getElementById('btn-generate-em-codes').addEventListener('click', async
   btn.disabled = true;
   btn.textContent = 'Generating…';
   try{
-    const res = await apiCall('/earthmap/batches', { participantCount, username: session.username, password: session.password });
+    const res = await apiCall('/earthmap/batches', { participantCount, category, username: session.username, password: session.password });
     status.style.color = '';
-    status.textContent = `${res.codes.length} codes generated for batch ${res.batchKey}. The leaderboard has reset for this fresh batch.`;
+    status.textContent = `${res.codes.length} codes generated for batch ${res.batchKey} (${category === 'junior' ? 'Junior' : 'Secondary'}). The leaderboard has reset for this fresh batch.`;
     document.getElementById('em-codes-list').style.display = 'block';
     document.getElementById('em-codes-ul').innerHTML = res.codes.map(c => `<li>${escapeHtml(c)}</li>`).join('');
     document.getElementById('btn-print-em-codes').onclick = () => printEmCodes(res.batchKey, res.codes);
@@ -1364,13 +1364,11 @@ function initAdminMapIfNeeded(){
 
 document.getElementById('btn-create-round').addEventListener('click', async ()=>{
   const title = document.getElementById('new-round-title').value.trim();
-  const category = document.getElementById('new-round-category').value.trim();
   if(!title){ showToast('Give the round a title first'); return; }
   const id = title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') + '-' + Date.now().toString(36).slice(-4);
-  rounds.push({id, title, category, icon:'📍', questions:[]});
+  rounds.push({id, title, icon:'📍', questions:[]});
   await saveRounds();
   document.getElementById('new-round-title').value='';
-  document.getElementById('new-round-category').value='';
   showToast('Round created');
   renderAdmin();
 });
@@ -1406,7 +1404,6 @@ function renderRoundsManager(){
       <div class="round-block-head">
         <div>
           <strong>${escapeHtml(r.title)}</strong>
-          <div class="pill" style="margin-top:6px;display:inline-block;">${escapeHtml(r.category||'')}</div>
         </div>
         <button class="btn small danger" data-round="${r.id}">Delete Round</button>
       </div>
@@ -1490,6 +1487,16 @@ document.getElementById('btn-clear-lb').addEventListener('click', async ()=>{
   await loadSettings();
   updateStartBtn();
   setupRouting();
+  if(!isAdminRoute){
+    try{
+      const current = await apiCall('/earthmap/current-batch');
+      const note = document.getElementById('active-category-note');
+      if(current.batchKey && current.category){
+        note.textContent = `Current competition category: ${current.category === 'junior' ? 'Junior — Std 5–8' : 'Secondary — Std 9–12'}`;
+        note.style.display = 'block';
+      }
+    }catch(e){ /* non-fatal -- the code claim itself will surface any real problem */ }
+  }
 })();
 
 })();

@@ -74,6 +74,7 @@ public class EarthMapBatch
 {
     public string BatchKey { get; set; } = "";
     public int ParticipantCount { get; set; }
+    public string Category { get; set; } = "secondary";
     public DateTime CreatedAtUtc { get; set; }
 }
 
@@ -86,11 +87,11 @@ public class EarthMapCode
     public DateTime? ClaimedAtUtc { get; set; }
 }
 
-public record CreateBatchRequest(int ParticipantCount, string Username, string Password);
+public record CreateBatchRequest(int ParticipantCount, string Category, string Username, string Password);
 
 public record CreateBatchResponse(string BatchKey, string[] Codes);
 
-public record CurrentBatchResponse(string? BatchKey);
+public record CurrentBatchResponse(string? BatchKey, string? Category);
 
 public record EarthMapClaimRequest(string Code);
 

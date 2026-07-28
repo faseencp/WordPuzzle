@@ -41,12 +41,14 @@ public static class EarthMapEndpoints
         if (req.ParticipantCount <= 0)
             return Results.BadRequest("A positive participantCount is required.");
 
+        var category = req.Category == "junior" ? "junior" : "secondary";
+
         using var conn = db.Open();
 
         var batchKey = "em" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
         await conn.ExecuteAsync(
-            "INSERT INTO dbo.EarthMapBatches (BatchKey, ParticipantCount, CreatedAtUtc) VALUES (@batchKey, @ParticipantCount, SYSUTCDATETIME())",
-            new { batchKey, req.ParticipantCount });
+            "INSERT INTO dbo.EarthMapBatches (BatchKey, ParticipantCount, Category, CreatedAtUtc) VALUES (@batchKey, @ParticipantCount, @category, SYSUTCDATETIME())",
+            new { batchKey, req.ParticipantCount, category });
 
         var codes = Enumerable.Range(1, req.ParticipantCount)
             .Select(CodeGenerator.ToLetterCode)
@@ -65,10 +67,10 @@ public static class EarthMapEndpoints
     private static async Task<IResult> GetCurrentBatch(Db db)
     {
         using var conn = db.Open();
-        var batchKey = await conn.QuerySingleOrDefaultAsync<string>(
-            "SELECT TOP 1 BatchKey FROM dbo.EarthMapBatches ORDER BY CreatedAtUtc DESC");
+        var batch = await conn.QuerySingleOrDefaultAsync<EarthMapBatch>(
+            "SELECT TOP 1 * FROM dbo.EarthMapBatches ORDER BY CreatedAtUtc DESC");
 
-        return Results.Ok(new CurrentBatchResponse(batchKey));
+        return Results.Ok(new CurrentBatchResponse(batch?.BatchKey, batch?.Category));
     }
 
     private static async Task<IResult> Claim(string batchKey, EarthMapClaimRequest req, Db db)

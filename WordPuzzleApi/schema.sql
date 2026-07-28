@@ -82,6 +82,7 @@ GO
 CREATE TABLE dbo.EarthMapBatches (
     BatchKey         nvarchar(64)  NOT NULL PRIMARY KEY,
     ParticipantCount int           NOT NULL,
+    Category         nvarchar(20)  NOT NULL DEFAULT 'secondary', -- 'junior' or 'secondary', same as word search
     CreatedAtUtc     datetime2     NOT NULL DEFAULT SYSUTCDATETIME()
 );
 GO

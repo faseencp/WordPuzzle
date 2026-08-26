@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>THE CALL — Attendance</title>
+<style>
+  :root{
+    --ink:#101828;
+    --paper:#F7F9FC;
+    --card:#FFFFFF;
+    --line:#E3E8F0;
+    --blue:#2563EB;
+    --blue-deep:#1D4ED8;
+    --blue-soft:#EFF4FF;
+    --green:#16A34A;
+    --muted:#5B6472;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:28px 16px 60px;}
+  header{text-align:center;margin-bottom:22px;}
+  header h1{font-size:30px;margin:0 0 4px;letter-spacing:0.5px;}
+  header p{margin:0;color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:1.4px;}
+
+  nav.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:20px;}
+  nav.tabs button{
+    flex:1;border:none;background:transparent;color:var(--muted);font-weight:600;font-size:14px;
+    padding:11px 10px;border-radius:999px;cursor:pointer;transition:all .15s ease;
+  }
+  nav.tabs button.active{background:var(--blue);color:#fff;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:16px;}
+  .card h2{margin:0 0 6px;font-size:20px;}
+  .card p.hint{margin:0 0 18px;color:var(--muted);font-size:14px;line-height:1.5;}
+
+  .flag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-bottom:18px;}
+  .flag-btn{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:var(--blue-soft);border:2px solid transparent;border-radius:10px;
+    padding:10px 4px;cursor:pointer;font-family:inherit;color:var(--ink);
+    transition:all .12s ease;
+  }
+  .flag-btn .flag{font-size:26px;line-height:1;}
+  .flag-btn .label{font-size:11px;font-weight:600;text-align:center;line-height:1.2;}
+  .flag-btn:hover{background:#E2ECFF;}
+  .flag-btn.selected{border-color:var(--blue);background:#DCE8FF;}
+
+  label.field-label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 6px;font-weight:700;}
+  input[type="text"]{
+    width:100%;background:var(--paper);border:1px solid var(--line);color:var(--ink);
+    padding:12px 13px;border-radius:9px;font-size:15px;font-family:inherit;outline:none;
+  }
+  input[type="text"]:focus{border-color:var(--blue);}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    background:var(--blue);color:#fff;border:none;padding:14px 20px;border-radius:9px;
+    font-weight:700;font-size:15px;cursor:pointer;margin-top:18px;transition:background .15s ease;
+  }
+  .btn:hover{background:var(--blue-deep);}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+
+  .done-state{text-align:center;padding:20px 6px;}
+  .done-state .check{font-size:44px;margin-bottom:8px;}
+  .done-state h3{margin:0 0 6px;font-size:19px;color:var(--green);}
+  .done-state p{margin:0;color:var(--muted);font-size:14px;}
+
+  .msg{margin-top:12px;font-size:13.5px;}
+  .msg.error{color:#DC2626;}
+
+  /* ---------- Dashboard ---------- */
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:640px){.dash-grid{grid-template-columns:1fr;}}
+  .dash-total{font-size:38px;font-weight:800;color:var(--blue);margin:2px 0 14px;}
+  .country-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);}
+  .country-row:last-child{border-bottom:none;}
+  .country-row .flag{font-size:20px;width:26px;text-align:center;}
+  .country-row .name{flex:1;font-size:14px;font-weight:600;}
+  .country-row .bar-track{flex:2;height:8px;background:var(--blue-soft);border-radius:4px;overflow:hidden;}
+  .country-row .bar-fill{height:100%;background:var(--blue);}
+  .country-row .count{font-family:monospace;font-weight:700;font-size:14px;min-width:28px;text-align:right;}
+  .dash-empty{color:var(--muted);font-size:14px;text-align:center;padding:20px 0;}
+  .dash-updated{text-align:center;color:var(--muted);font-size:12px;margin-top:16px;}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <header>
+    <h1>📞 THE CALL</h1>
+    <p>Online Zoom Event · Attendance</p>
+  </header>
+  <div id="content"></div>
+</div>
+
+<script>
+(function(){
+
+  const API_BASE = '/thecall/api';
+
+  const COUNTRIES = [
+    {name:'Bahrain', flag:'🇧🇭'}, {name:'Kuwait', flag:'🇰🇼'}, {name:'Oman', flag:'🇴🇲'},
+    {name:'Qatar', flag:'🇶🇦'}, {name:'Saudi East', flag:'🇸🇦'}, {name:'Saudi West', flag:'🇸🇦'},
+    {name:'UAE', flag:'🇦🇪'}, {name:'Egypt', flag:'🇪🇬'}, {name:'Canada', flag:'🇨🇦'},
+    {name:'England', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'}, {name:'Georgia', flag:'🇬🇪'}, {name:'Germany', flag:'🇩🇪'},
+    {name:'Ireland', flag:'🇮🇪'}, {name:'Japan', flag:'🇯🇵'}, {name:'Kazakhstan', flag:'🇰🇿'},
+    {name:'Kyrgystan', flag:'🇰🇬'}, {name:'Malaysia', flag:'🇲🇾'}, {name:'Maldives', flag:'🇲🇻'},
+    {name:'Poland', flag:'🇵🇱'}, {name:'Russia', flag:'🇷🇺'}, {name:'Scotland', flag:'🏴󠁧󠁢󠁳󠁣󠁴󠁿'},
+    {name:'Spain', flag:'🇪🇸'}, {name:'Turkey', flag:'🇹🇷'}, {name:'USA', flag:'🇺🇸'},
+    {name:'Uzbekistan', flag:'🇺🇿'}
+  ];
+  const FLAG_BY_NAME = Object.fromEntries(COUNTRIES.map(c=>[c.name, c.flag]));
+
+  // Wrapped defensively: some browsers/modes (private browsing, storage
+  // blocked by policy, or a sandboxed preview) throw on any localStorage
+  // access rather than just failing individual calls. Degrading to "always
+  // show the form" is safer than crashing the page in that case.
+  function safeGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
+  function safeSet(key, value){ try{ localStorage.setItem(key, value); }catch(e){} }
+
+  async function apiCall(path, body){
+    const res = await fetch(API_BASE + path, {
+      method: body ? 'POST' : 'GET',
+      headers: body ? {'Content-Type':'application/json'} : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    let data = null;
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok){
+      const err = new Error((data && data.title) || res.statusText || ('HTTP ' + res.status));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function getDeviceId(){
+    let id = safeGet('thecall_device_id');
+    if(!id){
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : ('dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36));
+      safeSet('thecall_device_id', id);
+    }
+    return id;
+  }
+
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function flagGridHtml(idPrefix){
+    return `<div class="flag-grid" id="${idPrefix}-grid">` +
+      COUNTRIES.map(c => `<button type="button" class="flag-btn" data-country="${escapeHtml(c.name)}">
+        <span class="flag">${c.flag}</span><span class="label">${escapeHtml(c.name)}</span>
+      </button>`).join('') +
+    `</div>`;
+  }
+
+  function mountConfirmForm(container, opts){
+    // opts: { kind, doneKey, title, hint, submitLabel, doneTitle, doneHint }
+    const alreadyDone = safeGet(opts.doneKey);
+    if(alreadyDone){
+      container.innerHTML = `
+        <div class="card">
+          <div class="done-state">
+            <div class="check">✅</div>
+            <h3>${escapeHtml(opts.doneTitle)}</h3>
+            <p>${escapeHtml(opts.doneHint)}</p>
+          </div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="card">
+        <h2>${escapeHtml(opts.title)}</h2>
+        <p class="hint">${escapeHtml(opts.hint)}</p>
+        <label class="field-label" style="margin-top:0;">Select your country</label>
+        ${flagGridHtml(opts.kind)}
+        <label class="field-label">Your name</label>
+        <input type="text" id="${opts.kind}-name" placeholder="e.g. Amina Yusuf" maxlength="60" />
+        <button class="btn" id="${opts.kind}-submit" disabled>${escapeHtml(opts.submitLabel)}</button>
+        <p class="msg" id="${opts.kind}-msg"></p>
+      </div>`;
+
+    let selectedCountry = null;
+    const grid = document.getElementById(opts.kind + '-grid');
+    const nameInput = document.getElementById(opts.kind + '-name');
+    const submitBtn = document.getElementById(opts.kind + '-submit');
+    const msg = document.getElementById(opts.kind + '-msg');
+
+    function updateBtn(){
+      submitBtn.disabled = !(selectedCountry && nameInput.value.trim().length>0);
+    }
+    grid.querySelectorAll('.flag-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        grid.querySelectorAll('.flag-btn').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedCountry = btn.dataset.country;
+        updateBtn();
+      });
+    });
+    nameInput.addEventListener('input', updateBtn);
+
+    submitBtn.addEventListener('click', async ()=>{
+      const name = nameInput.value.trim();
+      if(!selectedCountry || !name) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+      msg.textContent = '';
+      msg.className = 'msg';
+      try{
+        await apiCall('/' + opts.kind + 's', { name, country: selectedCountry, deviceId: getDeviceId() });
+        safeSet(opts.doneKey, '1');
+        mountConfirmForm(container, opts);
+      }catch(e){
+        if(e.status === 409){
+          safeSet(opts.doneKey, '1');
+          mountConfirmForm(container, opts);
+        }else{
+          msg.textContent = 'Could not reach the server — check your connection and try again.';
+          msg.className = 'msg error';
+          submitBtn.disabled = false;
+          submitBtn.textContent = opts.submitLabel;
+        }
+      }
+    });
+  }
+
+  function mountTabs(){
+    const content = document.getElementById('content');
+    content.innerHTML = `
+      <nav class="tabs">
+        <button class="active" data-tab="confirm">Confirm Participation</button>
+        <button data-tab="attend">Confirm Attendance</button>
+      </nav>
+      <div id="tab-body"></div>`;
+
+    const tabBtns = content.querySelectorAll('nav.tabs button');
+    const body = document.getElementById('tab-body');
+
+    function showTab(tab){
+      tabBtns.forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+      if(tab==='confirm'){
+        mountConfirmForm(body, {
+          kind:'confirmation', doneKey:'thecall_confirmed',
+          title:'Confirm Your Participation', submitLabel:'Confirm Participation',
+          hint:'Let us know you\'re joining THE CALL — pick your country and enter your name.',
+          doneTitle:"You're confirmed!", doneHint:'Thanks — we\'ll see you on the call. You can check in again from this device once the event starts.'
+        });
+      }else{
+        mountConfirmForm(body, {
+          kind:'attendance', doneKey:'thecall_attended',
+          title:'Confirm Your Attendance', submitLabel:'Confirm Attendance',
+          hint:'Use this during THE CALL itself, once the Zoom session is live.',
+          doneTitle:"You're checked in!", doneHint:'Thanks for joining THE CALL — enjoy the session.'
+        });
+      }
+    }
+    tabBtns.forEach(b=>b.addEventListener('click', ()=>showTab(b.dataset.tab)));
+    showTab('confirm');
+  }
+
+  function fmtCountryRows(rows, total){
+    if(!rows.length) return '<p class="dash-empty">No submissions yet.</p>';
+    const max = Math.max(...rows.map(r=>r.count), 1);
+    return rows.map(r => `
+      <div class="country-row">
+        <span class="flag">${FLAG_BY_NAME[r.country] || '🏳️'}</span>
+        <span class="name">${escapeHtml(r.country)}</span>
+        <span class="bar-track"><span class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></span></span>
+        <span class="count">${r.count}</span>
+      </div>`).join('');
+  }
+
+  let dashPollHandle = null;
+  function mountDashboard(){
+    const content = document.getElementById('content');
+    content.innerHTML = `
+      <div class="dash-grid">
+        <div class="card">
+          <h2>Confirmations</h2>
+          <p class="hint">Participants who confirmed they're joining.</p>
+          <div class="dash-total" id="dash-confirm-total">0</div>
+          <div id="dash-confirm-rows"></div>
+        </div>
+        <div class="card">
+          <h2>Live Attendance</h2>
+          <p class="hint">Checked in during THE CALL itself.</p>
+          <div class="dash-total" id="dash-attend-total">0</div>
+          <div id="dash-attend-rows"></div>
+        </div>
+      </div>
+      <p class="dash-updated" id="dash-updated"></p>`;
+
+    async function refresh(){
+      try{
+        const [confirmSummary, attendSummary] = await Promise.all([
+          apiCall('/confirmations/summary'),
+          apiCall('/attendances/summary')
+        ]);
+        document.getElementById('dash-confirm-total').textContent = confirmSummary.total;
+        document.getElementById('dash-confirm-rows').innerHTML = fmtCountryRows(confirmSummary.byCountry, confirmSummary.total);
+        document.getElementById('dash-attend-total').textContent = attendSummary.total;
+        document.getElementById('dash-attend-rows').innerHTML = fmtCountryRows(attendSummary.byCountry, attendSummary.total);
+        document.getElementById('dash-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      }catch(e){ /* transient network hiccup -- next poll retries */ }
+    }
+    refresh();
+    clearInterval(dashPollHandle);
+    dashPollHandle = setInterval(refresh, 4000);
+  }
+
+  const isDashboardRoute = /\/dashboard\/?$/.test(window.location.pathname);
+  if(isDashboardRoute) mountDashboard();
+  else mountTabs();
+
+})();
+</script>
+</body>
+</html>
